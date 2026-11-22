@@ -1,0 +1,50 @@
+{
+  "name": "Скорочтение за 14 дней",
+  "short_name": "Скорочтение",
+  "description": "Интерактивный курс скорочтения: 14 уроков по 20 минут, тренажёры, замеры скорости и понимания.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#f4f6fb",
+  "theme_color": "#3b6ef5",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "assets/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/img/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Продолжить курс",
+      "short_name": "Продолжить",
+      "url": "./index.html#/home",
+      "icons": [{ "src": "assets/img/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Мой прогресс",
+      "short_name": "Прогресс",
+      "url": "./index.html#/progress",
+      "icons": [{ "src": "assets/img/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

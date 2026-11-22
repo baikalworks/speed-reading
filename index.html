@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Интерактивный курс скорочтения: 14 уроков по 20 минут, тренажёры, замеры скорости и понимания.">
+<meta name="theme-color" content="#3b6ef5">
+<meta name="color-scheme" content="light">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Скорочтение">
+<title>Скорочтение за 14 дней — интерактивный курс</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-180.png">
+<link rel="stylesheet" href="assets/app.css">
+<script>
+/* Диагностика: ошибки скриптов попадают в скрытый блок, чтобы их можно было увидеть без консоли. */
+window.addEventListener('error', function (e) {
+  var d = document.getElementById('js-errors');
+  if (!d) { d = document.createElement('div'); d.id = 'js-errors'; d.style.display = 'none'; document.body.appendChild(d); }
+  d.textContent += ' | ' + (e.message || 'error') + ' @ ' + (e.filename || '') + ':' + (e.lineno || 0);
+});
+</script>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="#/home">
+    <span class="brand-mark">14</span>
+    <span class="brand-text">Скорочтение<small>интерактивный курс</small></span>
+  </a>
+
+  <nav class="mainnav">
+    <a href="#/home" data-nav="home">Курс</a>
+    <a href="#/progress" data-nav="progress">Прогресс</a>
+    <a href="#/cheat" data-nav="cheat">Шпаргалка</a>
+  </nav>
+
+  <div class="hud">
+    <div class="hud-streak" title="Серия дней подряд">
+      <span class="flame">▲</span><b id="hud-streak">0</b><span class="hud-sub">дн.</span>
+    </div>
+    <div class="hud-xp">
+      <div class="rankline">
+        <span id="hud-rank">Новичок</span>
+        <span id="hud-xp" class="muted">0 XP</span>
+      </div>
+      <div class="bar"><i id="hud-bar"></i></div>
+    </div>
+    <button id="btn-help" class="icon-btn" title="Как играть" aria-label="Как играть">?</button>
+  </div>
+</header>
+
+<main id="view"></main>
+
+<div class="install-bar" id="install-bar" hidden>
+  <div class="ib-text">
+    <b>Установить курс на телефон</b>
+    <span>Открывается с домашнего экрана и работает без интернета</span>
+  </div>
+  <button class="btn btn-primary btn-sm" id="btn-install">Установить</button>
+  <button class="icon-btn ib-close" id="btn-install-close" aria-label="Скрыть">×</button>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+<canvas id="fx"></canvas>
+<div id="modal-root"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/core.js"></script>
+<script src="assets/train.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
