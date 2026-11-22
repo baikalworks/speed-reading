@@ -357,7 +357,7 @@
       return html + '</div>';
     }).join('');
     return '<div class="theory">' +
-      (L.fig ? '<figure><img src="' + L.fig + '" alt="' + esc(L.fig_caption || '') + '" loading="lazy">' +
+      (L.fig ? '<figure><img src="assets/' + L.fig + '" alt="' + esc(L.fig_caption || '') + '" loading="lazy">' +
         '<figcaption>' + esc(L.fig_caption || '') + '</figcaption></figure>' : '') +
       blocks +
       (L.bullets && L.bullets.length ? '<div class="bullets"><ul>' + L.bullets.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
@@ -426,8 +426,6 @@
       '<title>День ' + m.day + ': ' + m.wpm + ' слов/мин, ' + m.comp + '%</title></circle>').join('');
     const labels = measures.map((m, i) => '<text x="' + xs(i) + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="#98a1b3">' + (m.label || ('д.' + m.day)) + '</text>').join('');
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;min-width:520px">' +
-      '<text x="8" y="14" font-size="11" fill="#98a1b3">слов/мин</text>' +
-      '<text x="' + (W - P.r + 8) + '" y="14" font-size="11" fill="#b9c2d2">%</text>' +
       g +
       '<polyline points="' + sp + '" fill="none" stroke="#3b6ef5" stroke-width="2.6" stroke-linejoin="round"/>' +
       '<polyline points="' + cp + '" fill="none" stroke="#0f9d76" stroke-width="2" stroke-dasharray="5 4"/>' +
