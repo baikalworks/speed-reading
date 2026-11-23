@@ -1,5 +1,5 @@
 /* Service worker: офлайн-кэш курса. При обновлении файлов поднимите VERSION. */
-const VERSION = 'sr14-v4';
+const VERSION = 'sr14-v5';
 const CACHE = 'skorochtenie-' + VERSION;
 
 const ASSETS = [

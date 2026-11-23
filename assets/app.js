@@ -209,6 +209,8 @@
           tile(best.comp || '—', 'лучшее понимание, %') +
           tile(st.rec.best.eff || '—', 'эффективная скорость') +
         '</div>' +
+        '<p class="footer-note" style="margin-top:22px">Версия ' + A.VERSION + ' · ' + A.VERSION_DATE +
+        ' · <a href="https://github.com/baikalworks/speed-reading/releases" target="_blank" rel="noopener">история версий и резервные копии</a></p>' +
       '</section>' +
       '</div>';
 
@@ -618,7 +620,8 @@
           '<button class="btn btn-ghost btn-sm" data-free>' + (st.freeMode ? 'Включить последовательный режим' : 'Открыть все дни') + '</button>' +
           '<button class="btn btn-ghost btn-sm" data-reset style="color:#a12a20;border-color:#f3d3cf">Сбросить прогресс</button>' +
         '</div>' +
-        '<p class="footer-note">' + esc(C.meta.note) + '</p></div>' +
+        '<p class="footer-note">' + esc(C.meta.note) + '</p>' +
+        '<p class="footer-note">Версия ' + A.VERSION + ' · ' + A.VERSION_DATE + '</p></div>' +
       '</div>';
 
     $('[data-export]', view).addEventListener('click', () => {
@@ -801,6 +804,7 @@
       '<p><b>Серия дней.</b> Занимайтесь ежедневно — серия растёт. Пропуск обнуляет серию, но не прогресс.</p>' +
       '<p><b>Боссы.</b> Три испытания на скорость и понимание. Победа даёт много опыта; проигрыш ничего не отнимает.</p>' +
       '<p><b>Честные правила.</b> Скорость засчитывается только при понимании от 70%. Подсматривать в текст при ответах бессмысленно: вы обманываете только свой прогресс.</p>' +
+      '<p class="muted" style="font-size:12.5px;margin-top:14px">Версия ' + A.VERSION + ' от ' + A.VERSION_DATE + '.</p>' +
       '<div class="row"><button class="btn btn-primary" data-close>Понятно</button></div>'
     );
   }

@@ -4,6 +4,8 @@
 
   const COURSE = window.COURSE;
   const KEY = 'speedread14_v1';
+  const VERSION = '1.4.0';
+  const VERSION_DATE = '23.11.2026';
 
   const RANKS = COURSE.ranks;
   const ACH = COURSE.achievements;
@@ -337,7 +339,7 @@
 
   /* ------------------------------ exports ----------------------------- */
   window.App = {
-    COURSE, RANKS, ACH, ACH_ICON,
+    COURSE, RANKS, ACH, ACH_ICON, VERSION, VERSION_DATE,
     $, $$, esc, wc, fmtTime, fmtNum, pct, todayKey, dayDiff,
     get state() { return state; },
     save, load, reset() { state = blank(); save(); },
