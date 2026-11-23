@@ -4,7 +4,7 @@
 
   const COURSE = window.COURSE;
   const KEY = 'speedread14_v1';
-  const VERSION = '1.6.0';
+  const VERSION = '1.6.1';
   const VERSION_DATE = '24.11.2026';
 
   const RANKS = COURSE.ranks;

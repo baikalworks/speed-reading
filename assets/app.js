@@ -216,7 +216,8 @@
           tile(st.rec.best.eff || '—', 'эффективная скорость') +
         '</div>' +
         '<p class="footer-note" style="margin-top:22px">Версия ' + A.VERSION + ' · ' + A.VERSION_DATE +
-        ' · <a href="https://github.com/baikalworks/speed-reading/releases" target="_blank" rel="noopener">история версий и резервные копии</a></p>' +
+        ' · <a href="https://github.com/baikalworks/speed-reading/releases" target="_blank" rel="noopener">история версий и резервные копии</a>' +
+        ' · <a href="#" data-restart>начать заново</a></p>' +
       '</section>' +
       '</div>';
 
@@ -233,6 +234,10 @@
       d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
     });
     $('[data-help]', view).addEventListener('click', helpModal);
+    $$('[data-restart]', view).forEach(a => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      confirmReset();
+    }));
   }
   function tile(v, l) {
     return '<div class="tile"><b>' + v + '</b><span>' + l + '</span></div>';
@@ -262,6 +267,20 @@
     const out = [];
     for (let i = 0; i < n; i++) out.push(JSON.parse(JSON.stringify(pool[i % pool.length])));
     return out;
+  }
+
+  function nextDayNavHTML(day) {
+    if (day >= 14) return '<a class="btn btn-ghost" href="#/home">На карту курса</a>';
+    const st = A.state;
+    const unlocked = A.lessonReady(day) || !!st.days[day];
+    if (unlocked) return '<a class="btn btn-ghost" href="#/day/' + (day + 1) + '">День ' + (day + 1) + ' →</a>';
+    return '<span class="muted" style="font-size:13px;align-self:center">Следующий день откроется после проверки</span>';
+  }
+
+  function updateDayNav() {
+    const slot = $('[data-daynav-next]', view);
+    if (!slot) return;
+    slot.innerHTML = nextDayNavHTML(parseHash().day);
   }
 
   function renderDay(day) {
@@ -341,7 +360,7 @@
       '<div data-pane="check" style="display:none" data-checkpane></div>' +
       '<div style="margin-top:34px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">' +
         (day > 1 ? '<a class="btn btn-ghost" href="#/day/' + (day - 1) + '">← День ' + (day - 1) + '</a>' : '<span></span>') +
-        (day < 14 ? '<a class="btn btn-ghost" href="#/day/' + (day + 1) + '">День ' + (day + 1) + ' →</a>' : '<a class="btn btn-ghost" href="#/home">На карту курса</a>') +
+        '<span data-daynav-next>' + nextDayNavHTML(day) + '</span>' +
       '</div>' +
       '</div>';
 
@@ -424,6 +443,7 @@
           }
           updateFin();
           refreshTiles();
+          updateDayNav();
         }
       };
 
@@ -607,6 +627,7 @@
           : 'Разберите объяснения под вопросами — и возвращайтесь к теории, если тема ещё «не села».') + '</div>';
       host.appendChild(box);
       if (!before) A.toast('+' + L.quiz.xp + ' XP · проверка', 'xp', '✓');
+      updateDayNav();
       const t = document.querySelector('.steps [data-tab="check"]');
       if (t && !t.querySelector('.dot') && !t.classList.contains('done')) t.insertAdjacentHTML('beforeend', '<span class="dot"></span>');
       const fin = $('[data-finish]', view);
@@ -753,7 +774,7 @@
           '<button class="btn btn-ghost btn-sm" data-export>Скачать прогресс (JSON)</button>' +
           '<button class="btn btn-ghost btn-sm" data-install>Установить на телефон</button>' +
           '<button class="btn btn-ghost btn-sm" data-free>' + (st.freeMode ? 'Включить последовательный режим' : 'Открыть все дни') + '</button>' +
-          '<button class="btn btn-ghost btn-sm" data-reset style="color:#a12a20;border-color:#f3d3cf">Сбросить прогресс</button>' +
+          '<button class="btn btn-ghost btn-sm" data-reset style="color:#a12a20;border-color:#f3d3cf">Начать заново</button>' +
         '</div>' +
         '<p class="footer-note">' + esc(C.meta.note) + '</p>' +
         '<p class="footer-note">Версия ' + A.VERSION + ' · ' + A.VERSION_DATE + '</p></div>' +
@@ -782,17 +803,7 @@
       renderProgress();
       A.toast('План: ' + b.dataset.budget + ' минут в день', '', '✓');
     }));
-    $('[data-reset]', view).addEventListener('click', () => {
-      A.modal('<h3>Сбросить прогресс?</h3><p>Удалятся XP, достижения, замеры и записи дневника. Это нельзя отменить.</p>' +
-        '<div class="row"><button class="btn btn-ghost" data-close>Отмена</button>' +
-        '<button class="btn btn-primary" data-yes style="background:#d92d20">Сбросить</button></div>', {
-        onMount(root, close) {
-          root.querySelector('[data-yes]').addEventListener('click', () => {
-            A.reset(); close(); location.hash = '#/home'; render();
-          });
-        }
-      });
-    });
+    $('[data-reset]', view).addEventListener('click', confirmReset);
   }
 
   /* ------------------------------- тренажёр ---------------------------- */
@@ -1072,6 +1083,23 @@
   }
 
   /* -------------------------------- modals ----------------------------- */
+  function confirmReset() {
+    A.modal('<h3>Начать курс заново?</h3>' +
+      '<p>Сбросятся опыт, достижения, замеры, записи дневника и выбранный план. Отменить это нельзя.</p>' +
+      '<p class="muted" style="font-size:13px">Курс откроется с первого дня, прогресс начнётся с чистого листа.</p>' +
+      '<div class="row"><button class="btn btn-ghost" data-close>Отмена</button>' +
+      '<button class="btn btn-primary" data-yes style="background:#d92d20">Начать заново</button></div>', {
+      onMount(root, close) {
+        root.querySelector('[data-yes]').addEventListener('click', () => {
+          A.reset();
+          close();
+          location.hash = '#/home';
+          setTimeout(() => { render(); onboarding(); A.toast('Начинаем заново', '', '↺'); }, 60);
+        });
+      }
+    });
+  }
+
   function helpModal() {
     A.modal(
       '<h3>Как устроен курс</h3>' +
