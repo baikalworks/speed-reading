@@ -4,8 +4,8 @@
 
   const COURSE = window.COURSE;
   const KEY = 'speedread14_v1';
-  const VERSION = '1.4.0';
-  const VERSION_DATE = '23.11.2026';
+  const VERSION = '1.5.0';
+  const VERSION_DATE = '24.11.2026';
 
   const RANKS = COURSE.ranks;
   const ACH = COURSE.achievements;
@@ -43,6 +43,7 @@
   const blank = () => ({
     v: 1, name: '', created: new Date().toISOString(),
     xp: 0, streak: 0, bestStreak: 0, lastDay: null,
+    dailyMinutes: 20, voice: 'svetlana', audioRate: 1.15,
     days: {}, ex: {}, quiz: {}, boss: {}, ach: {},
     rec: { baseline: null, best: { wpm: 0, comp: 0, eff: 0 }, measures: [], schulte: {}, wedge: null },
     journal: {}, cheatSeen: false

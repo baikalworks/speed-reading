@@ -611,3 +611,107 @@ button,.opt,.day,label{touch-action:manipulation}
 .flow-step span{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
 .flow-step svg{color:var(--muted);margin-top:3px}
 @media (max-width:820px){.flow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ============================================================
+   Шаги урока, калькулятор, аудио, счёт
+   ============================================================ */
+.steps{display:flex;align-items:stretch;gap:10px;margin:18px 0 22px;flex-wrap:wrap}
+.step{
+  flex:1;min-width:150px;display:flex;align-items:center;gap:10px;text-align:left;
+  padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);
+  cursor:pointer;transition:.18s;position:relative;overflow:hidden
+}
+.step:hover{border-color:var(--accent);transform:translateY(-1px)}
+.step .n{width:24px;height:24px;border-radius:8px;background:var(--soft);color:var(--muted);
+  display:grid;place-items:center;font-size:12px;font-weight:800;flex:none;transition:.18s}
+.step b{display:block;font-size:13px;line-height:1.2}
+.step span{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.step.on{border-color:var(--accent);background:var(--accent-soft)}
+.step.on .n{background:var(--accent);color:#fff}
+.step.done .n{background:var(--green);color:#fff}
+.step-arrow{align-self:center;color:var(--line);font-size:18px}
+.step .prog{position:absolute;left:0;bottom:0;height:2px;background:var(--accent);width:0;transition:width .4s}
+@media (max-width:820px){
+  .step-arrow{display:none}
+  .step{min-width:calc(50% - 5px)}
+}
+
+.next-cta{display:flex;justify-content:flex-end;gap:10px;margin:22px 0 4px}
+.next-cta .btn{box-shadow:0 10px 24px -16px rgba(0,0,0,.5)}
+
+.calc{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:16px 18px;max-width:640px}
+.calc-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.calc-row label{flex:1;font-size:13.5px;color:var(--muted)}
+.calc-row input{width:110px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;
+  background:var(--soft);color:var(--ink);font:inherit;text-align:right}
+.calc-out{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+.calc-out b{font-size:26px;color:var(--accent);margin-left:8px;letter-spacing:-.02em}
+.calc-note{font-size:12px;color:var(--muted);margin-top:8px}
+
+/* аудио-плеер теории */
+.audio-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:13px;background:var(--soft);margin:0 0 16px;flex-wrap:wrap}
+.audio-card .play{width:34px;height:34px;border-radius:50%;border:0;background:var(--accent);color:#fff;
+  display:grid;place-items:center;cursor:pointer;flex:none}
+.audio-card .play svg{width:13px;height:13px}
+.audio-card .meta{flex:1;min-width:140px}
+.audio-card .meta b{display:block;font-size:12px}
+.audio-select{background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+  font:inherit;font-size:12px;padding:5px 6px}
+.audio-time{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.theory-block{transition:opacity .35s, background .35s;border-radius:8px;padding:2px 6px;margin-left:-6px}
+.theory-block.read{opacity:.45}
+.theory-block.speaking{background:var(--accent-soft)}
+.karaoke-hint{font-size:12px;color:var(--muted);margin:-8px 0 14px}
+
+/* счёт и метроном */
+.count-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.beat-lamp{width:12px;height:12px;border-radius:50%;background:var(--violet);opacity:.25;transition:opacity .08s}
+.beat-lamp.on{opacity:1;box-shadow:0 0 0 5px color-mix(in srgb, var(--violet) 20%, transparent)}
+.count-demo{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:16px 18px;margin:0 0 16px}
+.count-demo .demo-line{font-size:19px;line-height:1.7;letter-spacing:-.01em}
+.count-demo .w{animation:demoRead 8s infinite;opacity:1}
+.count-demo .w:nth-child(1){animation-delay:0s}
+.count-demo .w:nth-child(2){animation-delay:.62s}
+.count-demo .w:nth-child(3){animation-delay:1.24s}
+.count-demo .w:nth-child(4){animation-delay:1.86s}
+.count-demo .w:nth-child(5){animation-delay:2.48s}
+.count-demo .w:nth-child(6){animation-delay:3.1s}
+.count-demo .w:nth-child(7){animation-delay:3.72s}
+.count-demo .w:nth-child(8){animation-delay:4.34s}
+.count-demo .w:nth-child(9){animation-delay:4.96s}
+.count-demo .w:nth-child(10){animation-delay:5.58s}
+@keyframes demoRead{0%,12%{opacity:1;color:var(--ink)}30%,100%{opacity:.38;color:var(--muted)}}
+.count-demo .demo-counter{font-size:12px;color:var(--muted);margin-top:8px}
+.count-demo .demo-counter b{color:var(--violet);font-size:14px}
+
+/* выбор в опросе */
+.choice-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
+.choice{padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--panel);
+  color:var(--ink);font-size:13px;cursor:pointer}
+.choice.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-2);font-weight:700}
+.theme-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.theme-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;background:var(--panel);cursor:pointer;color:var(--ink);font-size:13px}
+.theme-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.theme-card i{width:22px;height:22px;border-radius:6px;border:1px solid var(--line);flex:none}
+
+/* сравнение с прошлой попыткой */
+.duel{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}
+.duel b{color:var(--ink)}
+.duel .up{color:var(--green);font-weight:700}
+.duel .down{color:var(--orange);font-weight:700}
+
+.theme-btn{width:auto;min-width:32px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;border-radius:999px}
+.theme-label{font-size:12.5px;font-weight:700;letter-spacing:.01em}
+@media (max-width:1100px){.theme-label{display:none}.theme-btn{padding:0;width:32px;justify-content:center}}
+
+/* мягкое появление карточек и подсветка шага */
+@keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+[data-pane="train"] .ex{animation:riseIn .34s ease both}
+[data-pane="train"] .ex:nth-child(2){animation-delay:.05s}
+[data-pane="train"] .ex:nth-child(3){animation-delay:.1s}
+[data-pane="train"] .ex:nth-child(4){animation-delay:.15s}
+[data-pane="train"] .ex:nth-child(5){animation-delay:.2s}
+.step.on{box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)}
+.step[done], .step.done .n{animation:none}

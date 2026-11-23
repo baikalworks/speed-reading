@@ -13,6 +13,26 @@
     timers.length = 0;
   }
 
+  let actx = null;
+  function metroClick(accent) {
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime;
+      const o = actx.createOscillator();
+      const g = actx.createGain();
+      o.type = 'sine';
+      o.frequency.value = accent ? 620 : 880;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.035, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.connect(g);
+      g.connect(actx.destination);
+      o.start(t);
+      o.stop(t + 0.06);
+    } catch (e) { /* звук недоступен */ }
+  }
+
   function el(tag, cls, html) {
     const n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -239,7 +259,19 @@
         (mode === 'chunk' && p.marks ? '<button class="btn btn-ghost btn-sm" data-marks>Убрать метки</button>' : '') +
         '<span class="muted">' + esc(titleNote) + '</span>' +
       '</div>' +
-      (mode === 'count' ? '<div class="count-badge">Считайте про себя: <span class="n" data-count>1</span></div>' : '') +
+      (mode === 'count' ? (
+        '<div class="callout"><b>Что делать</b>Читайте текст и одновременно проговаривайте про себя «один-два-три-четыре», ' +
+        'ровно по одному числу на удар. Счёт занимает речевой канал: проговаривать слова становится труднее, и глаза начинают вести быстрее. ' +
+        'Числа не связаны со словами текста — это два независимых потока.</div>' +
+        '<div class="count-demo"><div class="demo-line">' +
+          ['Чтение', 'становится', 'быстрее,', 'когда', 'речь', 'не', 'успевает', 'за', 'глазами.']
+            .map(w => '<span class="w">' + w + '</span>').join(' ') +
+        '</div><div class="demo-counter">Счёт: <b>1 · 2 · 3 · 4</b> — одно число на удар</div></div>' +
+        '<div class="count-tools"><span class="beat-lamp" data-lamp></span>' +
+          '<button class="btn btn-ghost btn-sm" data-sound>Звук: вкл</button>' +
+          '<span class="muted" style="font-size:12px">Удар каждые 0,62 с, тихий и ровный</span></div>' +
+        '<div class="count-badge">Считайте про себя: <span class="n" data-count>1</span></div>'
+      ) : '') +
       '<div class="reader-frame" data-frame><div class="reader-text" data-text>' + textHTML + '</div></div>' +
       '<div data-returns></div>' +
       '<div data-q></div>';
@@ -253,9 +285,23 @@
 
     if (mode === 'count') {
       const badge = body.querySelector('[data-count]');
+      const lamp = body.querySelector('[data-lamp]');
+      const soundBtn = body.querySelector('[data-sound]');
+      let metroOn = true;
+      soundBtn.addEventListener('click', () => {
+        metroOn = !metroOn;
+        soundBtn.textContent = 'Звук: ' + (metroOn ? 'вкл' : 'выкл');
+      });
       startBtn.addEventListener('click', () => {
-        let n = 1;
-        countTick = every(() => { n = n % 4 + 1; badge.textContent = n; }, 620);
+        let n = 1, beat = 0;
+        countTick = every(() => {
+          n = n % 4 + 1;
+          badge.textContent = n;
+          lamp.classList.add('on');
+          setTimeout(() => lamp.classList.remove('on'), 130);
+          if (metroOn) metroClick(beat % 4 === 0);
+          beat++;
+        }, 620);
       });
     }
 

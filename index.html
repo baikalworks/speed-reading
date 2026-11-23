@@ -59,10 +59,11 @@ window.addEventListener('error', function (e) {
       <div class="bar"><i id="hud-bar"></i></div>
     </div>
     <div class="theme-wrap">
-      <button id="btn-theme" class="icon-btn" title="Тема оформления" aria-label="Тема оформления" aria-haspopup="true" aria-expanded="false">
+      <button id="btn-theme" class="icon-btn theme-btn" title="Тема оформления" aria-label="Тема оформления" aria-haspopup="true" aria-expanded="false">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>
         </svg>
+        <span class="theme-label">Тема</span>
       </button>
       <div class="theme-menu" id="theme-menu" hidden>
         <button type="button" data-theme-choice="paper"><i class="sw sw-paper"></i>Бумага</button>
@@ -90,6 +91,7 @@ window.addEventListener('error', function (e) {
 <div id="modal-root"></div>
 
 <script src="assets/data.js"></script>
+<script src="assets/audio/theory.js"></script>
 <script src="assets/core.js"></script>
 <script src="assets/train.js"></script>
 <script src="assets/app.js"></script>

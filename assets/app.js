@@ -29,6 +29,12 @@
       'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>';
   }
 
+  function stepHTML(id, n, title, sub, done) {
+    return '<button class="step' + (id === 'theory' ? ' on' : '') + (done ? ' done' : '') + '" data-tab="' + id + '">' +
+      '<span class="n">' + (done ? '✓' : n) + '</span>' +
+      '<div><b>' + esc(title) + '</b><span class="sub">' + esc(sub) + '</span></div></button>';
+  }
+
   function ringSVG(size, stroke, pct, color, track) {
     const r = (size - stroke) / 2;
     const c = 2 * Math.PI * r;
@@ -233,6 +239,31 @@
   }
 
   /* -------------------------------- day -------------------------------- */
+  function planExtras(L, day, budget) {
+    const n = budget <= 20 ? 0 : budget <= 25 ? 1 : budget <= 30 ? 2 : 3;
+    if (!n) return [];
+    const base = L.exercises[0] || { params: {} };
+    const textKey = (base.params && base.params.textKey) || 'attention';
+    const q = (base.params && base.params.questions) || [];
+    const pool = [
+      { type: 'measure', title: 'Контрольный замер', xp: 25, optional: true,
+        instruction: 'Прочитайте текст на время и ответьте на вопросы. Сравните результат с прошлым замером.',
+        params: { textKey: textKey, label: 'План', targetWpm: 0, minComp: 0, questions: q } },
+      { type: 'schulte', title: 'Шульте 5×5 — разминка', xp: 15, optional: true,
+        instruction: 'Один подход. Взгляд в центре, голову не поворачивайте.',
+        params: { size: 5, rounds: 1, targetSec: 55 } },
+      { type: 'wedge', title: 'Клин — захват строки', xp: 15, optional: true,
+        instruction: 'Один подход, чтение вслух, взгляд в центре строки.',
+        params: { rows: 7, targetSec: 35 } },
+      { type: 'reader', title: 'Чтение под темп 420', xp: 20, optional: true,
+        instruction: 'Держитесь за подсветку, затем проверьте понимание.',
+        params: { textKey: textKey, mode: 'pacer', wpm: 420, questions: q } }
+    ];
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(JSON.parse(JSON.stringify(pool[i % pool.length])));
+    return out;
+  }
+
   function renderDay(day) {
     const L = C.lessons[day - 1];
     const st = A.state;
@@ -272,7 +303,7 @@
             '<span class="lbl">' + (doneCount + (quizDone ? 1 : 0)) + '/' + (mainEx.length + 1) + '</span>' +
           '</div>' +
           '<span class="tag" style="background:' + ph.color + '1a;color:' + ph.color + '">День ' + day + '</span>' +
-          '<span class="tag">' + L.minutes + ' минут</span>' +
+          '<span class="tag">' + (st.dailyMinutes || L.minutes) + ' минут</span>' +
           '<span class="tag">до +' + totalXp + ' XP</span>' +
           (extraXp ? '<span class="tag">+' + extraXp + ' XP за дополнительные</span>' : '') +
           (isDone ? '<span class="tag" style="background:var(--green-soft);color:#0b6b51">день закрыт ✓</span>' : '') +
@@ -283,13 +314,20 @@
       (isDone ? '<div class="callout" style="border-color:var(--green);background:var(--green-soft)">' +
         '<b>День пройден</b>Можно повторять упражнения и улучшать личные рекорды. XP за повтор не начисляется.</div>' : '') +
 
-      '<div class="tabs">' +
-        '<button data-tab="theory" class="on">Теория</button>' +
-        '<button data-tab="train">Тренажёр <span class="muted" style="font-weight:600">' + doneCount + '/' + mainEx.length + '</span></button>' +
-        '<button data-tab="check">Проверка ' + (quizDone ? '<span class="dot"></span>' : '') + '</button>' +
+      '<div class="steps">' +
+        stepHTML('theory', '1', 'Теория', '3–4 мин', true) +
+        '<span class="step-arrow">→</span>' +
+        stepHTML('train', '2', 'Практика', doneCount + '/' + mainEx.length, doneCount === mainEx.length) +
+        '<span class="step-arrow">→</span>' +
+        stepHTML('check', '3', 'Проверка', quizDone ? 'готово' : L.quiz.questions.length + ' вопроса', quizDone) +
+        '<span class="step-arrow">→</span>' +
+        '<div class="step" style="cursor:default;opacity:.9"><span class="n">' + (isDone ? '✓' : '4') + '</span>' +
+          '<div><b>Итог</b><span>' + (isDone ? 'день закрыт' : '+40 XP') + '</span></div></div>' +
       '</div>' +
 
-      '<div data-pane="theory">' + theoryHTML(L) + '</div>' +
+      '<div data-pane="theory">' + theoryHTML(L) +
+        '<div class="next-cta"><button class="btn btn-primary" data-goto="train">К практике →</button></div>' +
+      '</div>' +
       '<div data-pane="train" style="display:none">' +
         '<div class="tiles" style="margin-bottom:18px">' +
           tile(doneCount + '/' + mainEx.length, 'упражнений выполнено') +
@@ -297,6 +335,7 @@
           tile(L.quiz.questions.length, 'вопросов проверки') +
         '</div>' +
         '<div data-exlist></div>' +
+        '<div data-planlist></div>' +
         '<div data-finish style="margin-top:20px"></div>' +
       '</div>' +
       '<div data-pane="check" style="display:none" data-checkpane></div>' +
@@ -306,18 +345,35 @@
       '</div>' +
       '</div>';
 
-    // tabs
-    const tabs = $$('.tabs button', view);
+    // шаги урока
+    const steps = $$('.steps .step[data-tab]', view);
     const panes = $$('[data-pane]', view);
     function showTab(name) {
-      tabs.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+      steps.forEach(b => b.classList.toggle('on', b.dataset.tab === name));
       panes.forEach(p => { p.style.display = p.dataset.pane === name ? '' : 'none'; });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    tabs.forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+    steps.forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+    $$('[data-goto]', view).forEach(b => b.addEventListener('click', () => showTab(b.dataset.goto)));
 
-    // exercises
+    // упражнения: основные, дополнительные и план по выбранному времени
     const list = $('[data-exlist]', view);
-    L.exercises.forEach((ex, idx) => {
+    const planHost = $('[data-planlist]', view);
+    const plan = planExtras(L, day, st.dailyMinutes || 20);
+    const items = L.exercises.map((ex, i) => ({ ex: ex, idx: i, plan: false }))
+      .concat(plan.map((ex, i) => ({ ex: ex, idx: 300 + i, plan: true })));
+    let planItems = null;
+    if (plan.length) {
+      planHost.innerHTML = '<div class="section-head" style="margin:28px 0 12px">' +
+        '<h2 style="font-size:18px">Ещё ' + plan.length + ' задания по вашему плану</h2>' +
+        '<span class="hint">' + (st.dailyMinutes || 20) + ' минут в день · для закрытия дня не обязательны</span></div>' +
+        '<div data-planitems></div>';
+      planItems = planHost.querySelector('[data-planitems]');
+    }
+    items.forEach((item) => {
+      const ex = item.ex, idx = item.idx;
+      const isPlan = item.plan;
+      const host = isPlan ? planItems : list;
       const card = document.createElement('div');
       card.className = 'ex';
       const isBoss = !!(ex.params && ex.params.boss);
@@ -327,13 +383,13 @@
       card.innerHTML =
         '<div class="ex-head">' +
           '<span class="kind' + (isBoss ? ' boss' : '') + '">' +
-            (isBoss ? 'Босс' : (isOpt ? 'Дополнительно' : (TYPE_LABEL[ex.type] || 'Задание'))) + '</span>' +
+            (isBoss ? 'Босс' : (isPlan ? 'План' : (isOpt ? 'Дополнительно' : (TYPE_LABEL[ex.type] || 'Задание')))) + '</span>' +
           icon(ex.type) +
           '<div><h4>' + esc(ex.title) + '</h4><div class="hint">' + esc(ex.instruction) + '</div></div>' +
           '<span class="xp">' + (saved && saved.done ? '✓ ' : '+') + ex.xp + ' XP</span>' +
         '</div>' +
         '<div class="ex-body"></div>';
-      list.appendChild(card);
+      host.appendChild(card);
       const body = card.querySelector('.ex-body');
 
       const ctx = {
@@ -401,7 +457,7 @@
       }).length;
       const tiles = $$('[data-pane="train"] .tile b');
       if (tiles[0]) tiles[0].textContent = doneN + '/' + mainEx.length;
-      const tab = $('.tabs button[data-tab="train"] .muted');
+      const tab = $('.steps [data-tab="train"] .sub');
       if (tab) tab.textContent = doneN + '/' + mainEx.length;
     }
 
@@ -412,10 +468,18 @@
         host.innerHTML = '<div class="callout" style="border-color:var(--green);background:var(--green-soft)"><b>День закрыт</b>Возвращайтесь завтра — или повторите тренажёры, чтобы закрепить.</div>';
         return;
       }
+      const needEx = mainEx.length - mainEx.filter((e) => {
+        const i = L.exercises.indexOf(e); const s = A.state.ex[A.exKey(day, i)]; return s && s.done;
+      }).length;
+      if (!needEx && !A.state.quiz[day]) {
+        host.innerHTML = '<div class="callout" style="border-color:var(--accent);background:var(--accent-soft)">' +
+          '<b>Практика готова</b>Осталась проверка — три вопроса по теории дня.</div>' +
+          '<div class="next-cta" style="justify-content:flex-start"><button class="btn btn-primary" data-goto="check">К проверке →</button></div>';
+        const b = host.querySelector('[data-goto]');
+        if (b) b.addEventListener('click', () => showTab('check'));
+        return;
+      }
       if (!readyNow) {
-        const needEx = mainEx.length - mainEx.filter((e) => {
-          const i = L.exercises.indexOf(e); const s = A.state.ex[A.exKey(day, i)]; return s && s.done;
-        }).length;
         host.innerHTML = '<p class="muted" style="font-size:14px">Чтобы закрыть день, осталось: ' +
           (needEx ? 'выполнить упражнений — ' + needEx : '') +
           (needEx && !A.state.quiz[day] ? ' и ' : '') +
@@ -433,7 +497,8 @@
 
     // quiz
     renderQuiz(day, $('[data-checkpane]', view));
-    wireAudio();
+    wireCalc();
+    wireTheoryAudio();
   }
 
   function summaryLine(ex, r) {
@@ -449,19 +514,50 @@
   }
 
   function theoryHTML(L) {
-    const blocks = L.theory.map(b => {
-      let html = '<div class="block"><h3>' + esc(b.h) + '</h3>' + (b.p ? '<p>' + esc(b.p) + '</p>' : '');
+    const blocks = L.theory.map((b, i) => {
+      let html = '<div class="block theory-block" data-block="' + (i + 1) + '">' +
+        '<h3>' + esc(b.h) + '</h3>' + (b.p ? '<p>' + esc(b.p) + '</p>' : '');
       if (b.list) html += '<ul>' + b.list.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
       return html + '</div>';
     }).join('');
-    const audio = L.audio ? '<div class="audio-card" data-audio="' + esc(L.audio) + '">' +
-      '<button class="play" type="button" aria-label="Слушать аудио-итог"></button>' +
-      '<div class="meta"><b>Аудио-итог дня</b><div class="audio-bar" data-bar><i data-fill></i></div></div>' +
-      '<span class="audio-time" data-time>0:00</span></div>' : '';
+
+    const hasAudio = !!(window.THEORY_AUDIO && window.THEORY_AUDIO[String(L.day)]);
+    const player = hasAudio ? '<div class="audio-card" data-theory-audio>' +
+      '<button class="play" type="button" aria-label="Слушать теорию"></button>' +
+      '<div class="meta"><b>Слушать теорию</b><div class="audio-bar" data-bar><i data-fill></i></div></div>' +
+      '<select class="audio-select" data-voice aria-label="Голос">' +
+        '<option value="svetlana"' + (A.state.voice !== 'dmitry' ? ' selected' : '') + '>Светлана</option>' +
+        '<option value="dmitry"' + (A.state.voice === 'dmitry' ? ' selected' : '') + '>Дмитрий</option>' +
+      '</select>' +
+      '<select class="audio-select" data-rate aria-label="Скорость">' +
+        [1, 1.15, 1.3].map(r => '<option value="' + r + '"' +
+          (Math.abs((A.state.audioRate || 1.15) - r) < 0.01 ? ' selected' : '') + '>' +
+          String(r).replace('.', ',') + '×</option>').join('') +
+      '</select>' +
+      '<span class="audio-time" data-time>0:00</span></div>' +
+      '<div class="karaoke-hint">Абзац подсвечивается по ходу озвучки, прочитанное становится серым. Можно нажать на любой абзац.</div>' : '';
+
+    const calc = L.fig && L.fig.indexOf('fig_metrics') >= 0
+      ? '<div class="calc" data-calc>' +
+          '<div class="calc-row"><label>Скорость чтения, слов в минуту</label>' +
+            '<input type="number" data-speed value="240" min="60" max="900" step="10"></div>' +
+          '<div class="calc-row"><label>Понимание, %</label>' +
+            '<input type="number" data-comp value="60" min="0" max="100" step="5"></div>' +
+          '<div class="calc-out">Эффективная скорость <b data-eff>144</b> слов/мин</div>' +
+          '<p class="calc-note">Это интерактивный калькулятор, а не ваши данные. Подставьте числа из своего замера: ' +
+          'скорость × понимание ÷ 100.</p>' +
+        '</div>'
+      : '';
+
+    const fig = L.fig && L.fig.indexOf('fig_metrics') < 0
+      ? '<figure><img src="assets/' + L.fig + '" alt="' + esc(L.fig_caption || '') + '" loading="lazy">' +
+        '<figcaption>' + esc(L.fig_caption || '') + '</figcaption></figure>'
+      : '';
+
     return '<div class="theory">' +
-      audio +
-      (L.fig ? '<figure><img src="assets/' + L.fig + '" alt="' + esc(L.fig_caption || '') + '" loading="lazy">' +
-        '<figcaption>' + esc(L.fig_caption || '') + '</figcaption></figure>' : '') +
+      player +
+      calc +
+      fig +
       blocks +
       (L.bullets && L.bullets.length ? '<div class="bullets"><ul>' + L.bullets.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
       (L.takeaway ? '<div class="callout"><b>Главное за 20 секунд</b>' + esc(L.takeaway) + '</div>' : '') +
@@ -490,8 +586,8 @@
           : 'Разберите объяснения под вопросами — и возвращайтесь к теории, если тема ещё «не села».') + '</div>';
       host.appendChild(box);
       if (!before) A.toast('+' + L.quiz.xp + ' XP · проверка', 'xp', '✓');
-      const t = document.querySelector('.tabs button[data-tab="check"]');
-      if (t && !t.querySelector('.dot')) t.insertAdjacentHTML('beforeend', '<span class="dot"></span>');
+      const t = document.querySelector('.steps [data-tab="check"]');
+      if (t && !t.querySelector('.dot') && !t.classList.contains('done')) t.insertAdjacentHTML('beforeend', '<span class="dot"></span>');
       const fin = $('[data-finish]', view);
       if (fin) {
         // пересобрать кнопку закрытия дня
@@ -613,8 +709,26 @@
           : '<p class="empty">Пока пусто. Дневник появляется после рефлексий в уроках 1, 11, 13 и 14.</p>') +
         '</div></div>' +
 
+      '<div class="section"><div class="section-head"><h2>Оформление</h2>' +
+      '<span class="hint">тема применяется сразу и запоминается</span></div>' +
+        '<div class="theme-cards">' +
+          [['paper', '#3b6ef5', 'Бумага', 'светлая, синий акцент'],
+           ['graphite', '#0e1014', 'Графит', 'тёмная, для вечера'],
+           ['sand', '#a1521a', 'Тёплая бумага', 'сепия, издательский вид']]
+            .map(t => '<button type="button" class="theme-card' + (currentTheme() === t[0] ? ' on' : '') +
+              '" data-theme-card="' + t[0] + '"><i style="background:' + t[1] + '"></i>' +
+              '<span><b style="display:block;font-size:13px">' + t[2] + '</b>' +
+              '<span style="font-size:11.5px;color:var(--muted)">' + t[3] + '</span></span></button>').join('') +
+        '</div></div>' +
+
       '<div class="section"><div class="section-head"><h2>Данные</h2></div>' +
-        '<div class="panel panel-pad" style="display:flex;gap:10px;flex-wrap:wrap">' +
+        '<div class="panel panel-pad" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
+          '<span class="muted" style="font-size:13px">Время в день:</span>' +
+          [20, 25, 30, 35, 40].map(m => '<button class="choice' + ((st.dailyMinutes || 20) === m ? ' on' : '') +
+            '" data-budget="' + m + '">' + m + '</button>').join('') +
+          '<span class="hint" style="margin-left:6px">больше 20 минут — добавляются тренажёры и чтение с таймером</span>' +
+        '</div>' +
+        '<div class="panel panel-pad" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">' +
           '<button class="btn btn-ghost btn-sm" data-export>Скачать прогресс (JSON)</button>' +
           '<button class="btn btn-ghost btn-sm" data-install>Установить на телефон</button>' +
           '<button class="btn btn-ghost btn-sm" data-free>' + (st.freeMode ? 'Включить последовательный режим' : 'Открыть все дни') + '</button>' +
@@ -640,6 +754,13 @@
     });
     const instBtn = $('[data-install]', view);
     if (instBtn) instBtn.addEventListener('click', installHelp);
+    $$('[data-theme-card]', view).forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeCard)));
+    $$('[data-budget]', view).forEach(b => b.addEventListener('click', () => {
+      A.state.dailyMinutes = +b.dataset.budget;
+      A.save();
+      renderProgress();
+      A.toast('План: ' + b.dataset.budget + ' минут в день', '', '✓');
+    }));
     $('[data-reset]', view).addEventListener('click', () => {
       A.modal('<h3>Сбросить прогресс?</h3><p>Удалятся XP, достижения, замеры и записи дневника. Это нельзя отменить.</p>' +
         '<div class="row"><button class="btn btn-ghost" data-close>Отмена</button>' +
@@ -723,41 +844,140 @@
   }
 
   /* -------------------------------- аудио ------------------------------ */
-  let audioEl = null;
-  function stopAudio() { if (audioEl) { try { audioEl.pause(); } catch (e) {} } }
+  let taAudio = null;
+  const taState = { index: 0, playing: false, list: [] };
+  const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  const PAUSE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+
+  function stopAudio() {
+    if (taAudio) { try { taAudio.pause(); } catch (e) { /* noop */ } }
+    taAudio = null;
+    taState.playing = false;
+  }
   function clock(sec) {
     if (!isFinite(sec)) return '0:00';
     const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
     return m + ':' + (s < 10 ? '0' : '') + s;
   }
-  function wireAudio() {
-    const card = $('.audio-card', view);
+  function taSetBlock(i) {
+    $$('.theory-block', view).forEach((el, n) => {
+      el.classList.toggle('speaking', n === i);
+      el.classList.toggle('read', n < i);
+    });
+  }
+
+  function wireTheoryAudio() {
+    const card = $('[data-theory-audio]', view);
     if (!card) return;
-    const src = 'assets/' + card.dataset.audio;
-    audioEl = new Audio(src);
-    audioEl.preload = 'metadata';
+    const day = parseHash().day;
+    const archive = (window.THEORY_AUDIO || {})[String(day)];
+    if (!archive) return;
+
+    let voice = A.state.voice === 'dmitry' ? 'dmitry' : 'svetlana';
+    let rate = A.state.audioRate || 1.15;
+    taState.list = archive[voice] || [];
+    taState.index = 0;
+
     const btn = card.querySelector('.play');
+    const bar = card.querySelector('[data-bar]');
     const fill = card.querySelector('[data-fill]');
     const time = card.querySelector('[data-time]');
-    const bar = card.querySelector('[data-bar]');
-    const playIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
-    const pauseIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
-    btn.innerHTML = playIcon;
-    audioEl.addEventListener('loadedmetadata', () => { time.textContent = '0:00 / ' + clock(audioEl.duration); });
-    audioEl.addEventListener('timeupdate', () => {
-      const pct = audioEl.duration ? audioEl.currentTime / audioEl.duration * 100 : 0;
-      fill.style.width = pct + '%';
-      time.textContent = clock(audioEl.currentTime) + ' / ' + clock(audioEl.duration);
-    });
-    audioEl.addEventListener('ended', () => { btn.innerHTML = playIcon; });
+    const voiceSel = card.querySelector('[data-voice]');
+    const rateSel = card.querySelector('[data-rate]');
+    btn.innerHTML = PLAY_ICON;
+    const total = taState.list.reduce((s, x) => s + (x.dur || 0), 0);
+    time.textContent = '0:00 / ' + clock(total);
+
+    function playFrom(i, autoplay) {
+      stopAudio();
+      if (i < 0 || i >= taState.list.length) return;
+      taState.index = i;
+      taSetBlock(i);
+      const seg = taState.list[i];
+      const a = new Audio('assets/audio/' + seg.src);
+      taAudio = a;
+      a.playbackRate = rate;
+      a.addEventListener('timeupdate', () => {
+        const pct = a.duration ? a.currentTime / a.duration * 100 : 0;
+        fill.style.width = pct + '%';
+        time.textContent = clock(a.currentTime) + ' / ' + clock(a.duration || seg.dur);
+      });
+      a.addEventListener('ended', () => {
+        if (taState.index + 1 < taState.list.length) playFrom(taState.index + 1, true);
+        else {
+          taState.playing = false;
+          btn.innerHTML = PLAY_ICON;
+          fill.style.width = '0%';
+          time.textContent = '0:00 / ' + clock(total);
+          taSetBlock(-1);
+        }
+      });
+      if (autoplay) {
+        const p = a.play();
+        if (p && p.catch) p.catch(() => { taState.playing = false; btn.innerHTML = PLAY_ICON; });
+        taState.playing = true;
+        btn.innerHTML = PAUSE_ICON;
+      }
+    }
+
     btn.addEventListener('click', () => {
-      if (audioEl.paused) { audioEl.play(); btn.innerHTML = pauseIcon; }
-      else { audioEl.pause(); btn.innerHTML = playIcon; }
+      if (taState.playing && taAudio) {
+        taAudio.pause();
+        taState.playing = false;
+        btn.innerHTML = PLAY_ICON;
+      } else if (taAudio) {
+        taAudio.play();
+        taState.playing = true;
+        btn.innerHTML = PAUSE_ICON;
+      } else {
+        playFrom(0, true);
+      }
     });
+
     bar.addEventListener('click', (e) => {
+      if (!taAudio || !taAudio.duration) return;
       const r = bar.getBoundingClientRect();
-      if (audioEl.duration) audioEl.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * audioEl.duration;
+      taAudio.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * taAudio.duration;
     });
+
+    voiceSel.addEventListener('change', () => {
+      voice = voiceSel.value;
+      A.state.voice = voice;
+      A.save();
+      taState.list = archive[voice] || [];
+      stopAudio();
+      taSetBlock(-1);
+      fill.style.width = '0%';
+      time.textContent = '0:00 / ' + clock(taState.list.reduce((s, x) => s + (x.dur || 0), 0));
+      btn.innerHTML = PLAY_ICON;
+    });
+
+    rateSel.addEventListener('change', () => {
+      rate = +rateSel.value;
+      A.state.audioRate = rate;
+      A.save();
+      if (taAudio) taAudio.playbackRate = rate;
+    });
+
+    $$('.theory-block', view).forEach((el, n) => {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => playFrom(n, true));
+    });
+  }
+
+  function wireCalc() {
+    const box = $('[data-calc]', view);
+    if (!box) return;
+    const sp = box.querySelector('[data-speed]');
+    const cp = box.querySelector('[data-comp]');
+    const out = box.querySelector('[data-eff]');
+    const upd = () => {
+      const v = Math.max(0, Math.min(100, +cp.value || 0));
+      out.textContent = Math.round((+sp.value || 0) * v / 100);
+    };
+    sp.addEventListener('input', upd);
+    cp.addEventListener('input', upd);
+    upd();
   }
 
   /* -------------------------------- cheat ------------------------------ */
@@ -810,22 +1030,48 @@
   }
 
   function onboarding() {
+    const mins = [20, 25, 30, 35, 40];
+    const chosenMin = A.state.dailyMinutes || 20;
+    const chosenTheme = currentTheme();
     A.modal(
-      '<h3>Как вас зовут?</h3>' +
-      '<p>Имя нужно только для интерфейса — данные хранятся в этом браузере и никуда не отправляются.</p>' +
-      '<input class="input" id="ob-name" maxlength="24" placeholder="Например, Анна" autocomplete="off">' +
+      '<h3>Настроим курс под вас</h3>' +
+      '<p class="muted" style="font-size:13px">Три быстрых вопроса. Всё можно изменить позже.</p>' +
+      '<div style="font-weight:700;font-size:14px;margin-top:6px">Как вас зовут?</div>' +
+      '<input class="input" id="ob-name" maxlength="24" placeholder="Например, Анна" autocomplete="off" style="margin-top:8px">' +
+      '<div style="font-weight:700;font-size:14px;margin-top:18px">Сколько времени в день готовы уделять?</div>' +
+      '<div class="choice-row" data-mins>' + mins.map(m =>
+        '<button type="button" class="choice' + (m === chosenMin ? ' on' : '') + '" data-min="' + m + '">' +
+        (m === 20 ? '20 минут' : m + ' минут') + '</button>').join('') + '</div>' +
+      '<p class="muted" style="font-size:12.5px;margin:2px 0 0">20 минут — базовая программа. Больше — добавим тренажёры и чтение с таймером.</p>' +
+      '<div style="font-weight:700;font-size:14px;margin-top:18px">Тема оформления</div>' +
+      '<div class="theme-cards" data-themes>' +
+        [['paper', '#3b6ef5', 'Бумага'], ['graphite', '#0e1014', 'Графит'], ['sand', '#a1521a', 'Тёплая']]
+          .map(t => '<button type="button" class="theme-card' + (t[0] === chosenTheme ? ' on' : '') +
+            '" data-theme-pick="' + t[0] + '"><i style="background:' + t[1] + '"></i>' + t[2] + '</button>').join('') +
+      '</div>' +
       '<div class="row"><button class="btn btn-ghost" data-skip>Пропустить</button>' +
       '<button class="btn btn-primary" data-save>Начать</button></div>', {
       dismissable: false,
       onMount(root, close) {
+        let min = chosenMin;
+        root.querySelectorAll('[data-min]').forEach(b => b.addEventListener('click', () => {
+          min = +b.dataset.min;
+          root.querySelectorAll('[data-min]').forEach(x => x.classList.toggle('on', x === b));
+        }));
+        root.querySelectorAll('[data-theme-pick]').forEach(b => b.addEventListener('click', () => {
+          root.querySelectorAll('[data-theme-pick]').forEach(x => x.classList.toggle('on', x === b));
+          applyTheme(b.dataset.themePick, true);
+        }));
         const inp = root.querySelector('#ob-name');
         inp.focus();
         const save = () => {
           const v = inp.value.trim();
-          if (v) { A.state.name = v; A.save(); }
+          A.state.dailyMinutes = min;
+          if (v) A.state.name = v;
+          A.save();
           close();
           render();
-          A.toast('Добро пожаловать в курс', 'achievement', '→');
+          A.toast('План: ' + min + ' минут в день', '', '✓');
         };
         root.querySelector('[data-save]').addEventListener('click', save);
         root.querySelector('[data-skip]').addEventListener('click', close);
