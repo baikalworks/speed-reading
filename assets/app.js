@@ -513,12 +513,33 @@
     return '';
   }
 
+  function wordize(text, start) {
+    let i = start;
+    const out = String(text).split(/(\s+)/).map(part => {
+      if (!part) return '';
+      if (/^\s+$/.test(part)) return part;
+      i++;
+      return '<span class="tw" data-wi="' + (i - 1) + '">' + esc(part) + '</span>';
+    }).join('');
+    return { html: out, next: i };
+  }
+
   function theoryHTML(L) {
+    let wi = 0;
     const blocks = L.theory.map((b, i) => {
-      let html = '<div class="block theory-block" data-block="' + (i + 1) + '">' +
-        '<h3>' + esc(b.h) + '</h3>' + (b.p ? '<p>' + esc(b.p) + '</p>' : '');
-      if (b.list) html += '<ul>' + b.list.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
-      return html + '</div>';
+      let inner = '';
+      if (b.h) {
+        const h = wordize(b.h, wi);
+        wi = h.next;
+        inner += '<h3>' + h.html + '</h3>';
+      }
+      if (b.p) {
+        const p = wordize(b.p, wi);
+        wi = p.next;
+        inner += '<p>' + p.html + '</p>';
+      }
+      if (b.list) inner += '<ul>' + b.list.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+      return '<div class="block theory-block" data-block="' + (i + 1) + '">' + inner + '</div>';
     }).join('');
 
     const hasAudio = !!(window.THEORY_AUDIO && window.THEORY_AUDIO[String(L.day)]);
@@ -853,6 +874,7 @@
     if (taAudio) { try { taAudio.pause(); } catch (e) { /* noop */ } }
     taAudio = null;
     taState.playing = false;
+    if (typeof taStopLoop === 'function') taStopLoop();
   }
   function clock(sec) {
     if (!isFinite(sec)) return '0:00';
@@ -864,6 +886,14 @@
       el.classList.toggle('speaking', n === i);
       el.classList.toggle('read', n < i);
     });
+  }
+  let taRaf = null;
+  function taStopLoop() {
+    if (taRaf) cancelAnimationFrame(taRaf);
+    taRaf = null;
+  }
+  function taClearWords() {
+    $$('.theory-block .tw', view).forEach(s => s.classList.remove('cur', 'read'));
   }
 
   function wireTheoryAudio() {
@@ -893,10 +923,36 @@
       if (i < 0 || i >= taState.list.length) return;
       taState.index = i;
       taSetBlock(i);
+      taClearWords();
       const seg = taState.list[i];
+      const blockEl = $$('.theory-block', view)[i];
+      const spans = blockEl ? Array.from(blockEl.querySelectorAll('.tw')) : [];
+      const times = Array.isArray(seg.times) ? seg.times : [];
+      let lastWi = -2;
       const a = new Audio('assets/audio/' + seg.src);
       taAudio = a;
       a.playbackRate = rate;
+
+      function tickWords() {
+        if (!taAudio) { taRaf = null; return; }
+        if (times.length && spans.length) {
+          const ms = taAudio.currentTime * 1000;
+          let wi = -1;
+          for (let k = 0; k < times.length; k++) {
+            if (times[k] <= ms) wi = k;
+            else break;
+          }
+          if (wi !== lastWi) {
+            for (let k = 0; k < spans.length; k++) {
+              spans[k].classList.toggle('read', k < wi);
+              spans[k].classList.toggle('cur', k === wi);
+            }
+            lastWi = wi;
+          }
+        }
+        taRaf = requestAnimationFrame(tickWords);
+      }
+      taRaf = requestAnimationFrame(tickWords);
       a.addEventListener('timeupdate', () => {
         const pct = a.duration ? a.currentTime / a.duration * 100 : 0;
         fill.style.width = pct + '%';

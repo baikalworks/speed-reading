@@ -715,3 +715,9 @@ button,.opt,.day,label{touch-action:manipulation}
 [data-pane="train"] .ex:nth-child(5){animation-delay:.2s}
 .step.on{box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent)}
 .step[done], .step.done .n{animation:none}
+
+/* караоке по словам */
+.theory-block .tw{transition:color .12s, opacity .12s, background .12s; border-radius:4px}
+.theory-block .tw.read{color:var(--muted);opacity:.55}
+.theory-block .tw.cur{background:var(--accent-soft);color:var(--ink);padding:0 2px;margin:0 -2px}
+[data-theme="graphite"] .theory-block .tw.cur{background:#25345a;color:#eaf0ff}
