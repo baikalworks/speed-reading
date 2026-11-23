@@ -179,6 +179,21 @@
         '</div>' +
       '</section>' +
 
+      '<section class="section" style="margin-top:16px">' +
+        '<div class="panel panel-pad" style="display:flex;align-items:center;gap:26px;flex-wrap:wrap">' +
+          '<div style="min-width:180px">' +
+            '<div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--accent)">20 МИНУТ</div>' +
+            '<h3 style="font-size:18px;margin-top:3px">Как устроен день</h3>' +
+          '</div>' +
+          '<div class="flow">' +
+            [['1', 'Теория', '3–4 минуты', 'reader'], ['2', 'Практика', '10–12 минут', 'schulte'],
+             ['3', 'Проверка', '3 минуты', 'checklist'], ['4', 'Итог', '1–2 минуты', 'reflection']]
+              .map(st => '<div class="flow-step"><span class="n">' + st[0] + '</span>' + icon(st[3]) +
+                '<div><b>' + st[1] + '</b><span>' + st[2] + '</span></div></div>').join('') +
+          '</div>' +
+        '</div>' +
+      '</section>' +
+
       '<section class="section">' +
         '<div class="section-head"><h2>Карта курса</h2>' +
         '<span class="hint">Пройдено ' + done + ' из 14 дней · откроется следующий, когда закроете текущий</span></div>' +
