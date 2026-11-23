@@ -126,7 +126,9 @@
         'Нужно: от ' + p.targetWpm + ' слов/мин при понимании от ' + p.minComp + '%. Рекорд не обязателен — попытку можно повторить.</div>' : '') +
       '<div class="reader-controls">' +
         '<button class="btn btn-primary" data-start>Старт</button>' +
+        '<button class="btn btn-ghost" data-pause disabled>Пауза</button>' +
         '<button class="btn btn-ghost" data-finish disabled>Готово</button>' +
+        '<button class="btn btn-ghost btn-sm" data-restart>Заново</button>' +
         '<div class="timer" data-timer>00:00</div>' +
         '<span class="muted" data-hint>Текст: ' + words + ' слов. Читайте в своём темпе.</span>' +
       '</div>' +
@@ -137,33 +139,81 @@
     const textEl = body.querySelector('[data-text]');
     const timerEl = body.querySelector('[data-timer]');
     const startBtn = body.querySelector('[data-start]');
+    const pauseBtn = body.querySelector('[data-pause]');
     const finBtn = body.querySelector('[data-finish]');
+    const restartBtn = body.querySelector('[data-restart]');
     const hint = body.querySelector('[data-hint]');
-    let t0 = 0, tick = null, done = false;
+    const initialHint = hint.textContent;
+    let elapsed = 0, startedAt = 0, running = false, tick = null, done = false;
+
+    const shown = () => elapsed + (running ? (performance.now() - startedAt) / 1000 : 0);
+
+    function startTick() {
+      clearInterval(tick);
+      tick = every(() => { timerEl.textContent = fmtTime(shown()); }, 200);
+    }
 
     startBtn.addEventListener('click', () => {
-      t0 = performance.now();
+      if (done) return;
+      elapsed = 0;
+      startedAt = performance.now();
+      running = true;
       A.wake.request();
       startBtn.disabled = true;
+      pauseBtn.disabled = false;
       finBtn.disabled = false;
+      pauseBtn.textContent = 'Пауза';
       frame.scrollTop = 0;
-      tick = every(() => { timerEl.textContent = fmtTime((performance.now() - t0) / 1000); }, 200);
+      startTick();
       hint.textContent = 'Идёт замер. Один проход, без возвратов.';
       timerEl.classList.add('run');
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (done) return;
+      if (running) {
+        elapsed += (performance.now() - startedAt) / 1000;
+        running = false;
+        clearInterval(tick);
+        pauseBtn.textContent = 'Продолжить';
+        timerEl.classList.remove('run');
+        hint.textContent = 'Пауза. Таймер остановлен — можно вернуться к тексту.';
+        A.wake.release();
+      } else {
+        startedAt = performance.now();
+        running = true;
+        pauseBtn.textContent = 'Пауза';
+        startTick();
+        hint.textContent = 'Идёт замер. Один проход, без возвратов.';
+        timerEl.classList.add('run');
+        A.wake.request();
+      }
+    });
+
+    restartBtn.addEventListener('click', () => {
+      clearInterval(tick);
+      running = false;
+      A.wake.release();
+      body.innerHTML = '';
+      measure(body, ex, ctx);
     });
 
     finBtn.addEventListener('click', () => {
       if (done) return;
       done = true;
+      if (running) elapsed += (performance.now() - startedAt) / 1000;
+      running = false;
       A.wake.release();
       clearInterval(tick);
-      const sec = Math.max(1, (performance.now() - t0) / 1000);
+      const sec = Math.max(1, elapsed);
       const wpm = words / (sec / 60);
       finBtn.disabled = true;
       startBtn.disabled = true;
+      pauseBtn.disabled = true;
       timerEl.textContent = fmtTime(sec);
       timerEl.classList.remove('run');
       textEl.classList.add('hidden');
+      hint.textContent = initialHint;
       const note = el('p', 'muted');
       note.style.margin = '10px 2px 0';
       note.textContent = 'Текст скрыт. ' + Math.round(wpm) + ' слов/мин · отвечайте по памяти.';
@@ -225,6 +275,7 @@
         '<div class="reader-controls">' +
           '<button class="btn btn-primary" data-start>Старт</button>' +
           '<button class="btn btn-ghost" data-pause disabled>Пауза</button>' +
+          '<button class="btn btn-ghost btn-sm" data-restart>Заново</button>' +
           '<div class="timer" data-timer>00:00</div>' +
           '<span class="muted">' + esc(titleNote) + '</span>' +
         '</div>' +
@@ -254,7 +305,9 @@
     body.innerHTML =
       '<div class="reader-controls">' +
         '<button class="btn btn-primary" data-start>Старт</button>' +
+        '<button class="btn btn-ghost" data-pause disabled>Пауза</button>' +
         '<button class="btn btn-ghost" data-finish disabled>Готово</button>' +
+        '<button class="btn btn-ghost btn-sm" data-restart>Заново</button>' +
         '<div class="timer" data-timer>00:00</div>' +
         (mode === 'chunk' && p.marks ? '<button class="btn btn-ghost btn-sm" data-marks>Убрать метки</button>' : '') +
         '<span class="muted">' + esc(titleNote) + '</span>' +
@@ -280,20 +333,30 @@
     const textEl = body.querySelector('[data-text]');
     const timerEl = body.querySelector('[data-timer]');
     const startBtn = body.querySelector('[data-start]');
+    const pauseBtn = body.querySelector('[data-pause]');
     const finBtn = body.querySelector('[data-finish]');
-    let t0 = 0, tick = null, countTick = null, done = false;
+    const restartBtn = body.querySelector('[data-restart]');
+    let elapsed = 0, startedAt = 0, running = false, tick = null, countTick = null, done = false;
+    let beatStart = null, beatStop = null;
+
+    const shown = () => elapsed + (running ? (performance.now() - startedAt) / 1000 : 0);
+    function startTick() {
+      clearInterval(tick);
+      tick = every(() => { timerEl.textContent = fmtTime(shown()); }, 200);
+    }
 
     if (mode === 'count') {
       const badge = body.querySelector('[data-count]');
       const lamp = body.querySelector('[data-lamp]');
       const soundBtn = body.querySelector('[data-sound]');
       let metroOn = true;
+      let n = 1, beat = 0;
       soundBtn.addEventListener('click', () => {
         metroOn = !metroOn;
         soundBtn.textContent = 'Звук: ' + (metroOn ? 'вкл' : 'выкл');
       });
-      startBtn.addEventListener('click', () => {
-        let n = 1, beat = 0;
+      beatStart = () => {
+        clearInterval(countTick);
         countTick = every(() => {
           n = n % 4 + 1;
           badge.textContent = n;
@@ -302,27 +365,68 @@
           if (metroOn) metroClick(beat % 4 === 0);
           beat++;
         }, 620);
-      });
+      };
+      beatStop = () => clearInterval(countTick);
     }
 
     startBtn.addEventListener('click', () => {
-      t0 = performance.now();
+      if (done) return;
+      elapsed = 0;
+      startedAt = performance.now();
+      running = true;
       A.wake.request();
       startBtn.disabled = true;
+      pauseBtn.disabled = false;
       finBtn.disabled = false;
+      pauseBtn.textContent = 'Пауза';
       frame.scrollTop = 0;
-      tick = every(() => { timerEl.textContent = fmtTime((performance.now() - t0) / 1000); }, 200);
+      startTick();
       timerEl.classList.add('run');
+      if (beatStart) beatStart();
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (done) return;
+      if (running) {
+        elapsed += (performance.now() - startedAt) / 1000;
+        running = false;
+        clearInterval(tick);
+        if (beatStop) beatStop();
+        pauseBtn.textContent = 'Продолжить';
+        timerEl.classList.remove('run');
+        A.wake.release();
+      } else {
+        startedAt = performance.now();
+        running = true;
+        pauseBtn.textContent = 'Пауза';
+        startTick();
+        timerEl.classList.add('run');
+        if (beatStart) beatStart();
+        A.wake.request();
+      }
+    });
+
+    restartBtn.addEventListener('click', () => {
+      clearInterval(tick);
+      clearInterval(countTick);
+      running = false;
+      A.wake.release();
+      body.innerHTML = '';
+      reader(body, ex, ctx);
     });
 
     finBtn.addEventListener('click', () => {
       if (done) return;
       done = true;
+      if (running) elapsed += (performance.now() - startedAt) / 1000;
+      running = false;
       A.wake.release();
-      clearInterval(tick); clearInterval(countTick);
-      const sec = Math.max(1, (performance.now() - t0) / 1000);
+      clearInterval(tick);
+      if (beatStop) beatStop();
+      const sec = Math.max(1, elapsed);
       const wpm = words / (sec / 60);
       finBtn.disabled = true;
+      pauseBtn.disabled = true;
       timerEl.textContent = fmtTime(sec);
       timerEl.classList.remove('run');
       textEl.classList.add('hidden');
@@ -514,8 +618,16 @@
         pauseBtn.dataset.resume = '';
         pauseBtn.textContent = 'Пауза';
         running = true;
+        A.wake.request();
         startClock();
       } else pause();
+    });
+    const restartBtn = body.querySelector('[data-restart]');
+    if (restartBtn) restartBtn.addEventListener('click', () => {
+      stopClock();
+      A.wake.release();
+      body.innerHTML = '';
+      reader(body, ex, ctx);
     });
   }
 
