@@ -11,12 +11,71 @@
     scan: 'Поиск', recall: 'Память', flexmatch: 'Решение', checklist: 'Чек-лист', reflection: 'Дневник'
   };
 
+  const ICONS = {
+    measure: '<path d="M12 20a8 8 0 1 1 8-8"/><path d="M12 12l4-4"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+    reader: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/>',
+    schulte: '<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M9 3.5v17M15 3.5v17M3.5 9h17M3.5 15h17"/>',
+    wedge: '<path d="M3 19h18M6 15h12M8.5 11h7M11 7h2"/>',
+    scan: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',
+    recall: '<path d="M9.5 4.5a4 4 0 0 0-4 4c0 1 .4 1.9 1 2.6-.6.7-1 1.6-1 2.9a4 4 0 0 0 4 4h.8V4.5z"/><path d="M14.5 4.5a4 4 0 0 1 4 4c0 1-.4 1.9-1 2.6.6.7 1 1.6 1 2.9a4 4 0 0 1-4 4h-.8V4.5z"/>',
+    flexmatch: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/>',
+    checklist: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l2.5 2.5L16 9.5"/>',
+    reflection: '<path d="M4 20l4-1 10-10a2.5 2.5 0 0 0-3.5-3.5L4.5 15.5 4 20z"/><path d="M13.5 6.5l3.5 3.5"/>'
+  };
+
+  function icon(type, cls) {
+    const body = ICONS[type] || ICONS.reader;
+    return '<svg class="' + (cls || 'ex-ic') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>';
+  }
+
+  function ringSVG(size, stroke, pct, color, track) {
+    const r = (size - stroke) / 2;
+    const c = 2 * Math.PI * r;
+    const off = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" style="stroke:' + track + '" stroke-width="' + stroke + '"/>' +
+      '<circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" style="stroke:' + color + '" stroke-width="' + stroke +
+      '" stroke-linecap="round" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/></svg>';
+  }
+
+  /* -------------------------------- темы ------------------------------- */
+  const THEME_KEY = 'sr14_theme';
+  function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'paper'; }
+  function applyTheme(t, silent) {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', t);
+    root.style.colorScheme = t === 'graphite' ? 'dark' : 'light';
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* noop */ }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'graphite' ? '#0e1014' : (t === 'sand' ? '#f5efe3' : '#3b6ef5'));
+    const menu = $('#theme-menu');
+    if (menu) menu.hidden = true;
+    $$('[data-theme-choice]').forEach(b => b.classList.toggle('on', b.dataset.themeChoice === t));
+    if (!silent && parseHash().name === 'progress') render();
+  }
+  function initTheme() {
+    applyTheme(currentTheme(), true);
+    const btn = $('#btn-theme'), menu = $('#theme-menu');
+    if (!btn || !menu) return;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      menu.hidden = !menu.hidden;
+      btn.setAttribute('aria-expanded', String(!menu.hidden));
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.theme-wrap')) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+    });
+    $$('[data-theme-choice]').forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeChoice)));
+  }
+
   /* ------------------------------- routing ----------------------------- */
   function parseHash() {
     const h = (location.hash || '#/home').replace(/^#/, '');
     const m = h.match(/^\/day\/(\d+)/);
     if (m) return { name: 'day', day: Math.max(1, Math.min(14, +m[1])) };
     if (h === '/progress') return { name: 'progress' };
+    if (h === '/train') return { name: 'train' };
     if (h === '/cheat') return { name: 'cheat' };
     return { name: 'home' };
   }
@@ -24,12 +83,14 @@
   function render() {
     window.Train && window.Train.stopAll();
     A.wake.release();
+    stopAudio();
     const r = parseHash();
     $$('.mainnav a').forEach(a => a.classList.remove('on'));
     const nav = $('.mainnav a[data-nav="' + (r.name === 'day' ? 'home' : r.name) + '"]');
     if (nav) nav.classList.add('on');
     if (r.name === 'day') renderDay(r.day);
     else if (r.name === 'progress') renderProgress();
+    else if (r.name === 'train') renderTrain();
     else if (r.name === 'cheat') renderCheat();
     else renderHome();
     A.renderHud();
@@ -84,6 +145,15 @@
         '<div class="days">' + items + '</div>';
     }).join('');
 
+    const rail = C.phases.map(ph => {
+      const ls = C.lessons.filter(l => l.phase === ph.id);
+      const dn = ls.filter(l => st.days[l.day]).length;
+      const pc = Math.round(dn / ls.length * 100);
+      return '<div class="phase-seg" style="--c:' + ph.color + '"><i class="bar-color"></i>' +
+        '<b>' + esc(ph.title) + '</b><span>дни ' + ph.days + ' · ' + dn + '/' + ls.length + '</span>' +
+        '<div class="fill"><em style="width:' + pc + '%"></em></div></div>';
+    }).join('');
+
     view.innerHTML =
       '<div class="view">' +
       '<section class="hero">' +
@@ -112,6 +182,7 @@
       '<section class="section">' +
         '<div class="section-head"><h2>Карта курса</h2>' +
         '<span class="hint">Пройдено ' + done + ' из 14 дней · откроется следующий, когда закроете текущий</span></div>' +
+        '<div class="phase-rail">' + rail + '</div>' +
         daysHTML +
       '</section>' +
 
@@ -161,7 +232,7 @@
 
     const ph = phaseOf(day);
     const isDone = !!st.days[day];
-    const mainEx = L.exercises.filter(e => !(e.params && e.params.boss));
+    const mainEx = L.exercises.filter(e => !(e.params && e.params.boss) && !e.optional);
     const doneCount = mainEx.filter((e) => {
       const idx = L.exercises.indexOf(e);
       const s = st.ex[A.exKey(day, idx)];
@@ -169,7 +240,8 @@
     }).length;
     const quizDone = !!st.quiz[day];
     const ready = A.lessonReady(day);
-    const totalXp = L.exercises.reduce((s, e) => s + e.xp, 0) + L.quiz.xp + 40;
+    const totalXp = L.exercises.filter(e => !e.optional).reduce((s, e) => s + e.xp, 0) + L.quiz.xp + 40;
+    const extraXp = L.exercises.filter(e => e.optional).reduce((s, e) => s + e.xp, 0);
 
     view.innerHTML =
       '<div class="view">' +
@@ -178,9 +250,14 @@
         '<h1>' + esc(L.title) + '</h1>' +
         '<p class="goal">' + esc(L.goal) + '</p>' +
         '<div class="lesson-meta">' +
+          '<div class="day-ring" title="Прогресс дня">' +
+            ringSVG(46, 5, (doneCount + (quizDone ? 1 : 0)) / (mainEx.length + 1) * 100, 'var(--accent)', 'var(--ring-track)') +
+            '<span class="lbl">' + (doneCount + (quizDone ? 1 : 0)) + '/' + (mainEx.length + 1) + '</span>' +
+          '</div>' +
           '<span class="tag" style="background:' + ph.color + '1a;color:' + ph.color + '">День ' + day + '</span>' +
           '<span class="tag">' + L.minutes + ' минут</span>' +
           '<span class="tag">до +' + totalXp + ' XP</span>' +
+          (extraXp ? '<span class="tag">+' + extraXp + ' XP за дополнительные</span>' : '') +
           (isDone ? '<span class="tag" style="background:var(--green-soft);color:#0b6b51">день закрыт ✓</span>' : '') +
           (L.exercises.some(e => e.params && e.params.boss) ? '<span class="tag boss">есть босс</span>' : '') +
         '</div>' +
@@ -227,11 +304,14 @@
       const card = document.createElement('div');
       card.className = 'ex';
       const isBoss = !!(ex.params && ex.params.boss);
+      const isOpt = !!ex.optional;
       const saved = st.ex[A.exKey(day, idx)];
       if (saved && saved.done) card.classList.add('done');
       card.innerHTML =
         '<div class="ex-head">' +
-          '<span class="kind' + (isBoss ? ' boss' : '') + '">' + (isBoss ? 'Босс' : (TYPE_LABEL[ex.type] || 'Задание')) + '</span>' +
+          '<span class="kind' + (isBoss ? ' boss' : '') + '">' +
+            (isBoss ? 'Босс' : (isOpt ? 'Дополнительно' : (TYPE_LABEL[ex.type] || 'Задание'))) + '</span>' +
+          icon(ex.type) +
           '<div><h4>' + esc(ex.title) + '</h4><div class="hint">' + esc(ex.instruction) + '</div></div>' +
           '<span class="xp">' + (saved && saved.done ? '✓ ' : '+') + ex.xp + ' XP</span>' +
         '</div>' +
@@ -336,6 +416,7 @@
 
     // quiz
     renderQuiz(day, $('[data-checkpane]', view));
+    wireAudio();
   }
 
   function summaryLine(ex, r) {
@@ -356,7 +437,12 @@
       if (b.list) html += '<ul>' + b.list.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>';
       return html + '</div>';
     }).join('');
+    const audio = L.audio ? '<div class="audio-card" data-audio="' + esc(L.audio) + '">' +
+      '<button class="play" type="button" aria-label="Слушать аудио-итог"></button>' +
+      '<div class="meta"><b>Аудио-итог дня</b><div class="audio-bar" data-bar><i data-fill></i></div></div>' +
+      '<span class="audio-time" data-time>0:00</span></div>' : '';
     return '<div class="theory">' +
+      audio +
       (L.fig ? '<figure><img src="assets/' + L.fig + '" alt="' + esc(L.fig_caption || '') + '" loading="lazy">' +
         '<figcaption>' + esc(L.fig_caption || '') + '</figcaption></figure>' : '') +
       blocks +
@@ -402,11 +488,20 @@
   }
 
   /* ------------------------------ progress ----------------------------- */
+  function cssVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+
   function chartSVG(measures) {
     if (!measures.length) {
       return '<div class="empty">Пока нет замеров. Пройдите день 1 — и здесь появится график скорости и понимания.</div>';
     }
     const W = 760, H = 280, P = { l: 46, r: 52, t: 16, b: 34 };
+    const cGrid = cssVar('--grid', '#eef1f7');
+    const cMuted = cssVar('--muted', '#98a1b3');
+    const cAccent = cssVar('--accent', '#3b6ef5');
+    const cGreen = cssVar('--green', '#0f9d76');
     const iw = W - P.l - P.r, ih = H - P.t - P.b;
     const n = measures.length;
     const xs = i => n === 1 ? P.l + iw / 2 : P.l + iw * i / (n - 1);
@@ -415,20 +510,20 @@
     let g = '';
     for (let i = 0; i <= 4; i++) {
       const y = P.t + ih * i / 4;
-      g += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="#eef1f7"/>';
-      g += '<text x="' + (P.l - 10) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="#98a1b3">' + (500 - 125 * i) + '</text>';
-      g += '<text x="' + (W - P.r + 10) + '" y="' + (y + 4) + '" font-size="11" fill="#b9c2d2">' + (100 - 25 * i) + '</text>';
+      g += '<line x1="' + P.l + '" y1="' + y + '" x2="' + (W - P.r) + '" y2="' + y + '" stroke="' + cGrid + '"/>';
+      g += '<text x="' + (P.l - 10) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="' + cMuted + '">' + (500 - 125 * i) + '</text>';
+      g += '<text x="' + (W - P.r + 10) + '" y="' + (y + 4) + '" font-size="11" fill="' + cMuted + '">' + (100 - 25 * i) + '</text>';
     }
     const sp = measures.map((m, i) => xs(i) + ',' + ySpeed(m.wpm)).join(' ');
     const cp = measures.map((m, i) => xs(i) + ',' + yComp(m.comp)).join(' ');
     const dots = measures.map((m, i) =>
-      '<circle cx="' + xs(i) + '" cy="' + ySpeed(m.wpm) + '" r="4.5" fill="#fff" stroke="#3b6ef5" stroke-width="2.5">' +
+      '<circle cx="' + xs(i) + '" cy="' + ySpeed(m.wpm) + '" r="4.5" fill="' + cssVar('--panel', '#fff') + '" stroke="' + cAccent + '" stroke-width="2.5">' +
       '<title>День ' + m.day + ': ' + m.wpm + ' слов/мин, ' + m.comp + '%</title></circle>').join('');
-    const labels = measures.map((m, i) => '<text x="' + xs(i) + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="#98a1b3">' + (m.label || ('д.' + m.day)) + '</text>').join('');
+    const labels = measures.map((m, i) => '<text x="' + xs(i) + '" y="' + (H - 12) + '" text-anchor="middle" font-size="11" fill="' + cMuted + '">' + (m.label || ('д.' + m.day)) + '</text>').join('');
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;min-width:520px">' +
       g +
-      '<polyline points="' + sp + '" fill="none" stroke="#3b6ef5" stroke-width="2.6" stroke-linejoin="round"/>' +
-      '<polyline points="' + cp + '" fill="none" stroke="#0f9d76" stroke-width="2" stroke-dasharray="5 4"/>' +
+      '<polyline points="' + sp + '" fill="none" stroke="' + cAccent + '" stroke-width="2.6" stroke-linejoin="round"/>' +
+      '<polyline points="' + cp + '" fill="none" stroke="' + cGreen + '" stroke-width="2" stroke-dasharray="5 4"/>' +
       dots + labels + '</svg>';
   }
 
@@ -446,6 +541,15 @@
       '<div class="view">' +
       '<div class="section-head" style="margin-top:6px"><h1 style="font-size:30px">Прогресс</h1>' +
       '<span class="hint">' + esc(st.name ? st.name + ' · ' : '') + 'с нами с ' + new Date(st.created).toLocaleDateString('ru-RU') + '</span></div>' +
+
+      '<div class="panel rank-card" style="margin-bottom:16px">' +
+        '<div class="rank-ring">' + ringSVG(118, 8, rank.progress, 'var(--accent)', 'var(--ring-track)') +
+          '<div class="inner"><b>' + esc(rank.name) + '</b><span>' + Math.round(rank.progress) + '%</span></div></div>' +
+        '<div><h2 style="font-size:20px;margin-bottom:4px">' + esc(rank.name) + '</h2>' +
+        '<p class="muted" style="margin:0;font-size:14px">' + fmtNum(st.xp) + ' XP' +
+        (rank.next ? ' · до ранга «' + esc(rank.next) + '» — ' + fmtNum(Math.max(0, rank.nextAt - st.xp)) + ' XP'
+          : ' · высший ранг') + '</p></div>' +
+      '</div>' +
 
       '<div class="tiles" style="margin-bottom:22px">' +
         tile(fmtNum(st.xp), 'опыта · ' + rank.name) +
@@ -528,6 +632,113 @@
           });
         }
       });
+    });
+  }
+
+  /* ------------------------------- тренажёр ---------------------------- */
+  function trainers() {
+    const qAttention = C.lessons[0].exercises[0].params.questions;
+    const qScan = C.lessons[5].exercises[0].params.questions;
+    return [
+      { id: 'schulte5', title: 'Таблица Шульте 5×5', desc: 'Периферийное внимание и скорость поиска. Держите взгляд в центре.', type: 'schulte', xp: 20, min: '1 мин', params: { size: 5, rounds: 1, targetSec: 55 } },
+      { id: 'schulte6', title: 'Таблица Шульте 6×6', desc: 'Больше чисел — шире захват. Не поворачивайте голову.', type: 'schulte', xp: 30, min: '2 мин', params: { size: 6, rounds: 1, targetSec: 90 } },
+      { id: 'wedge', title: 'Клиновидные строки', desc: 'Расширение захвата строки: взгляд в центре, края — периферией.', type: 'wedge', xp: 20, min: '1 мин', params: { rows: 7, targetSec: 35 } },
+      { id: 'rsvp350', title: 'RSVP · 350 слов/мин', desc: 'Узнавание слов в темпе выше привычного, без возвратов.', type: 'reader', xp: 20, min: '2 мин', params: { textKey: 'attention', mode: 'rsvp', wpm: 350, questions: qAttention } },
+      { id: 'rsvp500', title: 'RSVP · 500 слов/мин', desc: 'Проверка предела: на каком темпе рассыпается понимание.', type: 'reader', xp: 20, min: '2 мин', params: { textKey: 'attention', mode: 'rsvp', wpm: 500, questions: qAttention } },
+      { id: 'scan', title: 'Сканирование за 60 секунд', desc: 'Поиск фактов в плотном документе: сроки, имена, цифры.', type: 'scan', xp: 20, min: '1 мин', params: { textKey: 'doc_schedule', seconds: 60, questions: qScan } }
+    ];
+  }
+
+  function renderTrain() {
+    const defs = trainers();
+    const st = A.state;
+    view.innerHTML =
+      '<div class="view">' +
+      '<div class="section-head" style="margin-top:6px"><h1 style="font-size:30px">Тренажёр</h1>' +
+      '<span class="hint">короткие тренировки, не привязанные к дню</span></div>' +
+      '<div class="panel panel-pad" style="margin-bottom:20px;display:flex;gap:18px;align-items:center;flex-wrap:wrap">' +
+        '<div>' + icon('schulte', 'ex-ic') + '</div>' +
+        '<p class="muted" style="margin:0;max-width:70ch;font-size:14px">Эти упражнения можно делать в любой момент — до урока, после или вместо разминки. ' +
+        'Опыт начисляется один раз за тренажёр, рекорды обновляются при каждом подходе.</p>' +
+      '</div>' +
+      '<div class="train-grid">' +
+        defs.map((d, i) => {
+          const done = !!(st.ex[A.exKey(0, 100 + i)] && st.ex[A.exKey(0, 100 + i)].done);
+          return '<div class="train-card">' +
+            '<div style="display:flex;align-items:center;gap:10px">' + icon(d.type) +
+              '<h3>' + esc(d.title) + '</h3>' + (done ? '<span class="tag" style="margin-left:auto;background:var(--green-soft);color:#0b6b51">пройдено</span>' : '') +
+            '</div>' +
+            '<p>' + esc(d.desc) + '</p>' +
+            '<div class="row"><span class="tag">' + d.min + '</span><span class="tag">+' + d.xp + ' XP</span>' +
+              '<button class="btn btn-primary btn-sm" data-train="' + i + '">Начать</button></div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+      '<div id="train-host" style="margin-top:22px"></div>' +
+      '</div>';
+
+    $$('[data-train]', view).forEach(btn => btn.addEventListener('click', () => {
+      const def = defs[+btn.dataset.train];
+      const host = $('#train-host', view);
+      host.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'ex';
+      card.innerHTML =
+        '<div class="ex-head"><span class="kind">Тренажёр</span>' + icon(def.type) +
+          '<div><h4>' + esc(def.title) + '</h4><div class="hint">' + esc(def.desc) + '</div></div>' +
+          '<span class="xp">+' + def.xp + ' XP</span></div><div class="ex-body"></div>';
+      host.appendChild(card);
+      const body = card.querySelector('.ex-body');
+      const ex = { type: def.type, title: def.title, instruction: def.desc, xp: def.xp, params: def.params };
+      const key = 100 + defs.indexOf(def);
+      const ctx = {
+        day: 0, idx: key, ex: ex,
+        complete(result, exx, extra) {
+          A.completeExercise(0, key, exx || ex, Object.assign({}, result || {}, extra || {}));
+          card.classList.add('done');
+          card.querySelector('.xp').textContent = '✓ ' + def.xp + ' XP';
+        }
+      };
+      window.Train[def.type](body, ex, ctx);
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
+  }
+
+  /* -------------------------------- аудио ------------------------------ */
+  let audioEl = null;
+  function stopAudio() { if (audioEl) { try { audioEl.pause(); } catch (e) {} } }
+  function clock(sec) {
+    if (!isFinite(sec)) return '0:00';
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function wireAudio() {
+    const card = $('.audio-card', view);
+    if (!card) return;
+    const src = 'assets/' + card.dataset.audio;
+    audioEl = new Audio(src);
+    audioEl.preload = 'metadata';
+    const btn = card.querySelector('.play');
+    const fill = card.querySelector('[data-fill]');
+    const time = card.querySelector('[data-time]');
+    const bar = card.querySelector('[data-bar]');
+    const playIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    const pauseIcon = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+    btn.innerHTML = playIcon;
+    audioEl.addEventListener('loadedmetadata', () => { time.textContent = '0:00 / ' + clock(audioEl.duration); });
+    audioEl.addEventListener('timeupdate', () => {
+      const pct = audioEl.duration ? audioEl.currentTime / audioEl.duration * 100 : 0;
+      fill.style.width = pct + '%';
+      time.textContent = clock(audioEl.currentTime) + ' / ' + clock(audioEl.duration);
+    });
+    audioEl.addEventListener('ended', () => { btn.innerHTML = playIcon; });
+    btn.addEventListener('click', () => {
+      if (audioEl.paused) { audioEl.play(); btn.innerHTML = pauseIcon; }
+      else { audioEl.pause(); btn.innerHTML = playIcon; }
+    });
+    bar.addEventListener('click', (e) => {
+      const r = bar.getBoundingClientRect();
+      if (audioEl.duration) audioEl.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * audioEl.duration;
     });
   }
 
@@ -708,6 +919,7 @@
   /* ------------------------------- startup ----------------------------- */
   A.load();
   A.renderHud();
+  initTheme();
   initPWA();
   if (!location.hash) location.hash = '#/home';
   window.addEventListener('hashchange', render);

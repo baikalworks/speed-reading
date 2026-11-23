@@ -213,7 +213,7 @@
   function lessonReady(day) {
     const L = COURSE.lessons[day - 1];
     if (!L) return false;
-    const main = L.exercises.filter((e, i) => !e.params.boss);
+    const main = L.exercises.filter((e, i) => !e.params.boss && !e.optional);
     const allEx = main.every((e) => {
       const idx = L.exercises.indexOf(e);
       return state.ex[exKey(day, idx)] && state.ex[exKey(day, idx)].done;

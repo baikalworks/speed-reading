@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="paper">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Интерактивный курс скорочтения: 14 уроков по 20 минут, тренажёры, замеры скорости и понимания.">
 <meta name="theme-color" content="#3b6ef5">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -14,15 +14,23 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-180.png">
-<link rel="stylesheet" href="assets/app.css">
 <script>
-/* Диагностика: ошибки скриптов попадают в скрытый блок, чтобы их можно было увидеть без консоли. */
+/* Тема применяется до отрисовки, чтобы не было вспышки светлого фона. */
+(function () {
+  try {
+    var t = localStorage.getItem('sr14_theme') || 'paper';
+    if (['paper', 'graphite', 'sand'].indexOf(t) < 0) t = 'paper';
+    document.documentElement.setAttribute('data-theme', t);
+    document.documentElement.style.colorScheme = t === 'graphite' ? 'dark' : 'light';
+  } catch (e) {}
+})();
 window.addEventListener('error', function (e) {
   var d = document.getElementById('js-errors');
   if (!d) { d = document.createElement('div'); d.id = 'js-errors'; d.style.display = 'none'; document.body.appendChild(d); }
   d.textContent += ' | ' + (e.message || 'error') + ' @ ' + (e.filename || '') + ':' + (e.lineno || 0);
 });
 </script>
+<link rel="stylesheet" href="assets/app.css">
 </head>
 <body>
 
@@ -34,6 +42,7 @@ window.addEventListener('error', function (e) {
 
   <nav class="mainnav">
     <a href="#/home" data-nav="home">Курс</a>
+    <a href="#/train" data-nav="train">Тренажёр</a>
     <a href="#/progress" data-nav="progress">Прогресс</a>
     <a href="#/cheat" data-nav="cheat">Шпаргалка</a>
   </nav>
@@ -48,6 +57,18 @@ window.addEventListener('error', function (e) {
         <span id="hud-xp" class="muted">0 XP</span>
       </div>
       <div class="bar"><i id="hud-bar"></i></div>
+    </div>
+    <div class="theme-wrap">
+      <button id="btn-theme" class="icon-btn" title="Тема оформления" aria-label="Тема оформления" aria-haspopup="true" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>
+        </svg>
+      </button>
+      <div class="theme-menu" id="theme-menu" hidden>
+        <button type="button" data-theme-choice="paper"><i class="sw sw-paper"></i>Бумага</button>
+        <button type="button" data-theme-choice="graphite"><i class="sw sw-graphite"></i>Графит</button>
+        <button type="button" data-theme-choice="sand"><i class="sw sw-sand"></i>Тёплая бумага</button>
+      </div>
     </div>
     <button id="btn-help" class="icon-btn" title="Как играть" aria-label="Как играть">?</button>
   </div>

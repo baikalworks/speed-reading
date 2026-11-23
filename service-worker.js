@@ -1,5 +1,5 @@
 /* Service worker: офлайн-кэш курса. При обновлении файлов поднимите VERSION. */
-const VERSION = 'sr14-v2';
+const VERSION = 'sr14-v3';
 const CACHE = 'skorochtenie-' + VERSION;
 
 const ASSETS = [
@@ -60,6 +60,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+
+  // Аудио не кэшируем: файлы крупные, а Range-запросы ломают кэш.
+  if (url.pathname.indexOf('/audio/') >= 0) return;
 
   // Навигация: сначала сеть, при отсутствии — сохранённая оболочка.
   if (req.mode === 'navigate') {
