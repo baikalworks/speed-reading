@@ -247,22 +247,22 @@
   function planExtras(L, day, budget) {
     const n = budget <= 20 ? 0 : budget <= 25 ? 1 : budget <= 30 ? 2 : 3;
     if (!n) return [];
-    const base = L.exercises[0] || { params: {} };
-    const textKey = (base.params && base.params.textKey) || 'attention';
-    const q = (base.params && base.params.questions) || [];
+    const custom = (A.state.useCustom && (A.state.customText || '').trim().length > 100)
+      ? A.state.customText.trim() : '';
+    const t = custom ? { text: custom, title: 'Мой текст' } : { textKey: pickTextKey() };
     const pool = [
-      { type: 'measure', title: 'Контрольный замер', xp: 25, optional: true,
-        instruction: 'Прочитайте текст на время и ответьте на вопросы. Сравните результат с прошлым замером.',
-        params: { textKey: textKey, label: 'План', targetWpm: 0, minComp: 0, questions: q } },
+      { type: 'timedread', title: 'Чтение на время', xp: 25, optional: true,
+        instruction: 'Текст на 90 секунд. Успейте дочитать — таймер подгоняет темп.',
+        params: Object.assign({ seconds: 90, questions: [] }, t) },
       { type: 'schulte', title: 'Шульте 5×5 — разминка', xp: 15, optional: true,
         instruction: 'Один подход. Взгляд в центре, голову не поворачивайте.',
         params: { size: 5, rounds: 1, targetSec: 55 } },
       { type: 'wedge', title: 'Клин — захват строки', xp: 15, optional: true,
         instruction: 'Один подход, чтение вслух, взгляд в центре строки.',
         params: { rows: 7, targetSec: 35 } },
-      { type: 'reader', title: 'Чтение под темп 420', xp: 20, optional: true,
-        instruction: 'Держитесь за подсветку, затем проверьте понимание.',
-        params: { textKey: textKey, mode: 'pacer', wpm: 420, questions: q } }
+      { type: 'reader', title: 'RSVP на скорости', xp: 20, optional: true,
+        instruction: 'Слова сменяются в темпе 380. Держите ритм, без проговаривания.',
+        params: Object.assign({ mode: 'rsvp', wpm: 380, questions: [] }, t) }
     ];
     const out = [];
     for (let i = 0; i < n; i++) out.push(JSON.parse(JSON.stringify(pool[i % pool.length])));
@@ -857,11 +857,20 @@
     return Math.max(8, Math.round(spec.base * boost));
   }
 
-  function trainParams(spec, eff) {
+  function trainParams(spec, eff, t) {
     if (spec.type === 'schulte') return { size: spec.params.size, rounds: 1, targetSec: eff };
     if (spec.type === 'wedge') return { rows: spec.params.rows, limit: eff, targetSec: eff };
-    if (spec.type === 'timedread') return { textKey: spec.params.textKey, seconds: eff, questions: spec.params.questions };
-    return { textKey: spec.params.textKey, mode: 'rsvp', wpm: eff, questions: spec.params.questions };
+    const base = t.text ? { text: t.text, title: t.title } : { textKey: t.textKey };
+    if (spec.type === 'timedread') return Object.assign(base, { seconds: eff, questions: [] });
+    return Object.assign(base, { mode: 'rsvp', wpm: eff, questions: [] });
+  }
+
+  function pickTextKey() {
+    const pool = Object.keys(C.texts).filter(k => {
+      const n = wc(C.texts[k].text);
+      return n >= 120 && n <= 520;
+    });
+    return pool[Math.floor(Math.random() * pool.length)] || 'attention';
   }
 
   function trackUnlocked(track) { return A.state.train[track.id] || 1; }
@@ -884,12 +893,18 @@
   function startTrainer(track, level, card, trackIdx) {
     const spec = track.levels[level - 1];
     const eff = trainEff(spec, track);
+    const custom = (A.state.useCustom && (A.state.customText || '').trim().length > 100)
+      ? A.state.customText.trim() : '';
+    const rk = pickTextKey();
+    const textConf = custom
+      ? { text: custom, title: 'Мой текст' }
+      : { textKey: rk, title: (C.texts[rk] || {}).title || 'Текст' };
     const ex = {
       type: spec.type === 'rsvp' ? 'reader' : spec.type,
       title: track.title + ' · ' + spec.name,
       instruction: track.desc,
       xp: spec.xp,
-      params: trainParams(spec, eff)
+      params: trainParams(spec, eff, textConf)
     };
     const host = $('#train-host', view);
     host.innerHTML = '';
@@ -911,7 +926,7 @@
         if (spec.type === 'schulte') pass = r.valid !== false && r.seconds <= eff;
         else if (spec.type === 'wedge') pass = !!r.pass;
         else if (spec.type === 'timedread') pass = !!r.pass;
-        else pass = (r.comp || 0) >= 70;
+        else pass = true;
 
         const st = A.state;
         if (pass) {
@@ -952,6 +967,19 @@
         'Включите «Ускорение» — после каждой удачной попытки время будет сокращаться на 10%, а темп расти.</p>' +
         '<label class="switch" style="margin-left:auto"><input type="checkbox" data-accel' + (st.trainAccel ? ' checked' : '') + '> Ускорение</label>' +
       '</div>' +
+      '<div class="panel panel-pad" style="margin-bottom:18px">' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<b style="font-size:14px">Свой текст</b>' +
+          '<span class="hint">вставьте текст или загрузите .txt — он пойдёт в «Чтение на время» и RSVP</span>' +
+          '<label class="switch" style="margin-left:auto"><input type="checkbox" data-usecustom' + (st.useCustom ? ' checked' : '') + '> использовать мой текст</label>' +
+        '</div>' +
+        '<textarea class="input" data-custom rows="3" style="margin-top:10px" placeholder="Вставьте сюда свой текст (не меньше 100 символов)…">' + esc(st.customText || '') + '</textarea>' +
+        '<div style="display:flex;gap:12px;align-items:center;margin-top:8px;flex-wrap:wrap">' +
+          '<button class="btn btn-ghost btn-sm" data-savecustom>Сохранить</button>' +
+          '<input type="file" accept=".txt,text/plain" data-file style="font-size:12px">' +
+          '<span class="muted" data-customlen>' + (st.customText || '').length + ' символов</span>' +
+        '</div>' +
+      '</div>' +
       '<div class="train-grid" data-tracks></div>' +
       '<div id="train-host" style="margin-top:22px"></div>' +
       '</div>';
@@ -985,6 +1013,39 @@
       }
       A.save();
       renderTrain();
+    });
+
+    const custom = $('[data-custom]', view);
+    const customLen = $('[data-customlen]', view);
+    if (custom) custom.addEventListener('input', () => {
+      customLen.textContent = custom.value.length + ' символов';
+    });
+    const saveCustom = $('[data-savecustom]', view);
+    if (saveCustom) saveCustom.addEventListener('click', () => {
+      A.state.customText = custom.value.trim();
+      A.save();
+      A.toast(A.state.customText.length > 100 ? 'Текст сохранён' : 'Текст слишком короткий — нужно от 100 символов', A.state.customText.length > 100 ? '' : 'bad', '✓');
+      renderTrain();
+    });
+    const fileInput = $('[data-file]', view);
+    if (fileInput) fileInput.addEventListener('change', () => {
+      const f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        custom.value = String(reader.result || '').slice(0, 20000);
+        customLen.textContent = custom.value.length + ' символов';
+        A.toast('Файл загружен — нажмите «Сохранить»', '', '↓');
+      };
+      reader.readAsText(f);
+    });
+    const useCustom = $('[data-usecustom]', view);
+    if (useCustom) useCustom.addEventListener('change', () => {
+      A.state.useCustom = useCustom.checked;
+      A.save();
+      if (useCustom.checked && (A.state.customText || '').length < 100) {
+        A.toast('Сначала сохраните текст длиннее 100 символов', 'bad', '!');
+      }
     });
   }
 

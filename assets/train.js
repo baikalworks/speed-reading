@@ -258,7 +258,7 @@
   /* ------------------------------ reader ------------------------------ */
   function reader(body, ex, ctx) {
     const p = ex.params;
-    const txt = A.COURSE.texts[p.textKey];
+    const txt = { text: p.text || ((A.COURSE.texts[p.textKey] || {}).text || '') };
     const mode = p.mode || 'plain';
     const words = wc(txt.text);
     const titleNote = {
@@ -450,6 +450,15 @@
 
       function goQuestions() {
         const qhost = body.querySelector('[data-q]');
+        if (!p.questions.length) {
+          resultBox(body, {
+            title: 'Готово',
+            nums: [{ v: Math.round(wpm), l: 'слов/мин' }],
+            msg: esc('Темп: ' + Math.round(wpm) + ' слов/мин. Понимание в тренажёре не проверяется — только скорость и удержание ритма.')
+          });
+          ctx.complete({ wpm: Math.round(wpm), comp: null, eff: null, seconds: Math.round(sec), returns: returns }, ex, {});
+          return;
+        }
         askQuestions(qhost, p.questions, (res) => {
           const comp = p.questions.length ? pct(res.score, res.total) : 100;
           const eff = Math.round(wpm * comp / 100);
@@ -634,10 +643,11 @@
   /* ----------------------------- timed read --------------------------- */
   function timedread(body, ex, ctx) {
     const p = ex.params;
-    const txt = A.COURSE.texts[p.textKey];
+    const source = p.text || ((A.COURSE.texts[p.textKey] || {}).text || '');
+    const txt = { text: source, title: p.title || 'Текст' };
     const limit = p.seconds || 60;
     const words = wc(txt.text);
-    const qs = p.questions || [];
+    const qs = [];
 
     body.innerHTML =
       '<div class="reader-controls">' +
@@ -702,21 +712,17 @@
         return;
       }
 
-      askQuestions(qhost, qs, (res) => {
-        const comp = qs.length ? pct(res.score, res.total) : 100;
-        const wpm = Math.round(words / (sec / 60));
-        resultBox(body, {
-          tone: comp >= 70 ? 'win' : '',
-          title: 'Успели',
-          nums: [
-            { v: wpm, l: 'слов/мин' },
-            { v: comp + '%', l: 'понимание' },
-            { v: (limit - sec).toFixed(1) + ' с', l: 'запас' }
-          ],
-          msg: comp >= 70 ? 'Прочитано с пониманием. В следующий раз времени будет меньше.' : 'Скорость есть, понимание просело — читайте чуть медленнее.'
-        });
-        ctx.complete({ wpm: wpm, comp: comp, pass: comp >= 70, seconds: Math.round(sec) }, ex, {});
+      const wpm = Math.round(words / (sec / 60));
+      resultBox(body, {
+        tone: 'win',
+        title: 'Успели',
+        nums: [
+          { v: wpm, l: 'слов/мин' },
+          { v: (limit - sec).toFixed(1) + ' с', l: 'запас' }
+        ],
+        msg: 'Текст прочитан до нуля. В следующий раз времени будет меньше — это и есть тренировка темпа.'
       });
+      ctx.complete({ wpm: wpm, comp: null, pass: true, seconds: Math.round(sec) }, ex, {});
     }
   }
 
