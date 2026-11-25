@@ -808,3 +808,11 @@ body[data-theme="graphite"] .kids-stars{background:rgba(255,255,255,.08)}
   .schulte{gap:6px}
   .reader-controls.bottom{position:sticky;bottom:0;background:var(--panel);padding:10px 0 4px;z-index:5}
 }
+
+/* чтение с маской */
+.mask-frame{position:relative;height:300px;overflow:hidden;border:1px solid var(--line);border-radius:12px;
+  background:var(--panel);padding:0 18px}
+.mask-frame:before,.mask-frame:after{content:"";position:absolute;left:0;right:0;height:52px;pointer-events:none;z-index:2}
+.mask-frame:before{top:0;background:linear-gradient(180deg,var(--panel),transparent)}
+.mask-frame:after{bottom:0;background:linear-gradient(0deg,var(--panel),transparent)}
+.mask-frame .reader-text{padding:14px 0}

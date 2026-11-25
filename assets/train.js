@@ -774,6 +774,89 @@
     }
   }
 
+  function pickRandomText() {
+    const keys = Object.keys(A.COURSE.texts).filter(k => {
+      const n = wc(A.COURSE.texts[k].text);
+      return k.indexOf('kid_') !== 0 && n >= 120 && n <= 520;
+    });
+    const k = keys[Math.floor(Math.random() * keys.length)] || 'attention';
+    return A.COURSE.texts[k];
+  }
+
+  /* --------------------------- маска (антирегрессия) ------------------ */
+  function mask(body, ex, ctx) {
+    const p = ex.params;
+    const txt = p.text ? { text: p.text } : (p.randomText ? pickRandomText() : A.COURSE.texts[p.textKey]);
+    const limit = p.seconds || 60;
+    const words = wc(txt.text);
+
+    body.innerHTML =
+      '<div class="reader-controls">' +
+        '<button class="btn btn-primary" data-start>Старт · ' + limit + ' с</button>' +
+        '<button class="btn btn-ghost" data-restart>Заново</button>' +
+        '<div class="timer" data-timer>' + fmtTime(limit) + '</div>' +
+        '<span class="muted">Маска не даёт вернуться назад. Читайте только вперёд.</span>' +
+      '</div>' +
+      '<div class="mask-frame" data-frame><div class="reader-text" data-text>' + textParas(txt.text) + '</div></div>' +
+      '<div data-res></div>';
+
+    const frame = body.querySelector('[data-frame]');
+    const timerEl = body.querySelector('[data-timer]');
+    const startBtn = body.querySelector('[data-start]');
+    const restartBtn = body.querySelector('[data-restart]');
+    let raf = null, t0 = 0, done = false, lastBeep = 99;
+
+    restartBtn.addEventListener('click', () => {
+      if (raf) cancelAnimationFrame(raf);
+      A.wake.release();
+      body.innerHTML = '';
+      mask(body, ex, ctx);
+    });
+
+    function finish() {
+      if (done) return;
+      done = true;
+      if (raf) cancelAnimationFrame(raf);
+      A.wake.release();
+      startBtn.disabled = true;
+      timerEl.classList.remove('danger');
+      const wpm = Math.round(words / (limit / 60));
+      resultBox(body.querySelector('[data-res]'), {
+        tone: 'win',
+        title: 'Прочитано без возвратов',
+        nums: [{ v: wpm, l: 'слов/мин' }, { v: limit + ' с', l: 'время' }],
+        msg: 'Маска не позволяла вернуться — значит, текст прочитан один раз. Это и есть навык.'
+      });
+      ctx.complete({ wpm: wpm, comp: null, pass: true, seconds: limit }, ex, {});
+    }
+
+    startBtn.addEventListener('click', () => {
+      t0 = performance.now();
+      done = false;
+      A.wake.request();
+      startBtn.disabled = true;
+      frame.scrollTop = 0;
+      timerEl.classList.remove('danger');
+      const loop = () => {
+        if (done) return;
+        const elapsed = (performance.now() - t0) / 1000;
+        const left = Math.max(0, limit - elapsed);
+        timerEl.textContent = fmtTime(left);
+        timerEl.classList.toggle('danger', left <= 5);
+        const secLeft = Math.ceil(left);
+        if (left <= 5 && secLeft !== lastBeep) {
+          lastBeep = secLeft;
+          if (secLeft > 0) beep(secLeft === 1 ? 1200 : 880, 0.09, 0.05);
+        }
+        const max = Math.max(1, frame.scrollHeight - frame.clientHeight);
+        frame.scrollTop = Math.min(max, elapsed / limit * max);
+        if (left <= 0 || frame.scrollTop >= max - 1) { finish(); return; }
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
+    });
+  }
+
   /* ------------------------------ schulte ----------------------------- */
   function schulte(body, ex, ctx) {
     const p = ex.params;
@@ -1265,7 +1348,7 @@
   }
 
   window.Train = {
-    measure, reader, timedread, schulte, wedge, scan, recall, flexmatch, checklist, reflection,
+    measure, reader, timedread, mask, schulte, wedge, scan, recall, flexmatch, checklist, reflection,
     askQuestions, stopAll, resultBox, textParas
   };
 })();
