@@ -90,6 +90,8 @@
     window.Train && window.Train.stopAll();
     A.wake.release();
     stopAudio();
+    const gaBar = document.getElementById('global-audio');
+    if (gaBar) gaBar.hidden = true;
     const r = parseHash();
     $$('.mainnav a').forEach(a => a.classList.remove('on'));
     const nav = $('.mainnav a[data-nav="' + (r.name === 'day' ? 'home' : r.name) + '"]');
@@ -98,7 +100,7 @@
     else if (r.name === 'progress') renderProgress();
     else if (r.name === 'train') renderTrain();
     else if (r.name === 'cheat') renderCheat();
-    else renderHome();
+    else { if (A.state.mode === 'kids') renderKids(); else renderHome(); }
     A.renderHud();
     window.scrollTo({ top: 0, behavior: 'instant' in document.documentElement.style ? 'instant' : 'auto' });
   }
@@ -817,12 +819,14 @@
     const qA = C.lessons[0].exercises[0].params.questions;
     return [
       { id: 'schulte', title: 'Таблица Шульте', icon: 'schulte',
-        desc: 'Находите числа по порядку. Взгляд держите в центре, голову не поворачивайте.',
+        desc: 'Находите числа по порядку. Время идёт на убывание: не успели — попробуйте снова.',
         levels: [
-          { name: '3×3', type: 'schulte', xp: 10, base: 25, params: { size: 3 } },
-          { name: '4×4', type: 'schulte', xp: 15, base: 35, params: { size: 4 } },
-          { name: '5×5', type: 'schulte', xp: 20, base: 50, params: { size: 5 } },
-          { name: '6×6', type: 'schulte', xp: 25, base: 75, params: { size: 6 } }
+          { name: '3×3 · 30', type: 'schulte', xp: 10, base: 30, params: { size: 3 } },
+          { name: '4×4 · 40', type: 'schulte', xp: 10, base: 40, params: { size: 4 } },
+          { name: '4×4 · 30', type: 'schulte', xp: 15, base: 30, params: { size: 4 } },
+          { name: '5×5 · 50', type: 'schulte', xp: 15, base: 50, params: { size: 5 } },
+          { name: '5×5 · 40', type: 'schulte', xp: 20, base: 40, params: { size: 5 } },
+          { name: '6×6 · 60', type: 'schulte', xp: 25, base: 60, params: { size: 6 } }
         ] },
       { id: 'wedge', title: 'Клин', icon: 'wedge',
         desc: 'Читайте строки вслух, взгляд в центре. Включите точку фокуса, если взгляд соскакивает.',
@@ -847,29 +851,38 @@
           { name: '300', type: 'rsvp', xp: 20, base: 300, params: { textKey: 'attention', questions: qA } },
           { name: '350', type: 'rsvp', xp: 25, base: 350, params: { textKey: 'attention', questions: qA } },
           { name: '400', type: 'rsvp', xp: 30, base: 400, params: { textKey: 'attention', questions: qA } }
+        ] },
+      { id: 'blocks', title: 'Блоки по 4 слова', icon: 'reader', pool: 'adult',
+        desc: 'Подсвечиваются четыре слова сразу и сменяются — тот же ритм, что в счёте 1-2-3-4.',
+        levels: [
+          { name: '240', type: 'reader', xp: 15, base: 240 },
+          { name: '300', type: 'reader', xp: 20, base: 300 },
+          { name: '360', type: 'reader', xp: 25, base: 360 },
+          { name: '420', type: 'reader', xp: 30, base: 420 }
         ] }
     ];
   }
 
   function trainEff(spec, track) {
     const boost = A.state.trainBoost[track.id] || 1;
-    if (spec.type === 'rsvp') return Math.round(spec.base / boost);
+    if (spec.type === 'rsvp' || spec.type === 'reader') return Math.round(spec.base / boost);
     return Math.max(8, Math.round(spec.base * boost));
   }
 
   function trainParams(spec, eff, t) {
-    if (spec.type === 'schulte') return { size: spec.params.size, rounds: 1, targetSec: eff };
+    if (spec.type === 'schulte') return { size: spec.params.size, rounds: 1, targetSec: eff, countdown: eff };
     if (spec.type === 'wedge') return { rows: spec.params.rows, limit: eff, targetSec: eff };
     const base = t.text ? { text: t.text, title: t.title } : { textKey: t.textKey };
     if (spec.type === 'timedread') return Object.assign(base, { seconds: eff, questions: [] });
+    if (spec.type === 'reader') return Object.assign(base, { mode: 'pacer', chunk: 4, wpm: eff, questions: [] });
     return Object.assign(base, { mode: 'rsvp', wpm: eff, questions: [] });
   }
 
-  function pickTextKey() {
-    const pool = Object.keys(C.texts).filter(k => {
-      const n = wc(C.texts[k].text);
-      return n >= 120 && n <= 520;
-    });
+  function pickTextKey(kind) {
+    const keys = Object.keys(C.texts);
+    const pool = kind === 'kids'
+      ? keys.filter(k => k.indexOf('kid_') === 0)
+      : keys.filter(k => k.indexOf('kid_') !== 0 && wc(C.texts[k].text) >= 120 && wc(C.texts[k].text) <= 520);
     return pool[Math.floor(Math.random() * pool.length)] || 'attention';
   }
 
@@ -877,11 +890,14 @@
 
   function refreshTrackCard(card, track) {
     const unlocked = trackUnlocked(track);
-    card.querySelectorAll('.lvl').forEach(b => {
+    const isKids = !!card.querySelector('.kid-lvl');
+    const sel = isKids ? '.kid-lvl' : '.lvl';
+    card.querySelectorAll(sel).forEach(b => {
       const L = +b.dataset.lvl;
       b.classList.toggle('passed', L < unlocked);
       b.classList.toggle('locked', L > unlocked);
       b.disabled = L > unlocked;
+      if (isKids) b.textContent = L < unlocked ? '✓' : track.levels[L - 1].name;
     });
     const bl = card.querySelector('[data-boost]');
     if (bl) {
@@ -890,12 +906,12 @@
     }
   }
 
-  function startTrainer(track, level, card, trackIdx) {
+  function startTrainer(track, level, card, trackIdx, keyBase) {
     const spec = track.levels[level - 1];
     const eff = trainEff(spec, track);
     const custom = (A.state.useCustom && (A.state.customText || '').trim().length > 100)
       ? A.state.customText.trim() : '';
-    const rk = pickTextKey();
+    const rk = pickTextKey(track.pool);
     const textConf = custom
       ? { text: custom, title: 'Мой текст' }
       : { textKey: rk, title: (C.texts[rk] || {}).title || 'Текст' };
@@ -906,7 +922,10 @@
       xp: spec.xp,
       params: trainParams(spec, eff, textConf)
     };
-    const host = $('#train-host', view);
+    let host = document.getElementById('train-host');
+    if (!host) { host = document.createElement('div'); host.id = 'train-host'; }
+    card.insertAdjacentElement('afterend', host);
+    host.style.margin = '14px 0';
     host.innerHTML = '';
     const box = document.createElement('div');
     box.className = 'ex';
@@ -916,7 +935,7 @@
       '<span class="xp">+' + spec.xp + ' XP</span></div><div class="ex-body"></div>';
     host.appendChild(box);
     const body = box.querySelector('.ex-body');
-    const key = 400 + trackIdx * 10 + (level - 1);
+    const key = (keyBase || 400) + trackIdx * 10 + (level - 1);
     const ctx = {
       day: 0, idx: key, ex: ex,
       complete(result, exx, extra) {
@@ -1049,7 +1068,83 @@
     });
   }
 
-/* -------------------------------- аудио ------------------------------ */
+  function kidsGames() {
+    return [
+      { id: 'k_schulte', title: 'Найди числа', emoji: '🔢', icon: 'schulte', pool: 'kids',
+        desc: 'Нажимай числа по порядку. Чем больше поле — тем интереснее.',
+        levels: [
+          { name: '3×3', type: 'schulte', xp: 5, base: 40, params: { size: 3 } },
+          { name: '4×4', type: 'schulte', xp: 5, base: 50, params: { size: 4 } },
+          { name: '5×5', type: 'schulte', xp: 10, base: 65, params: { size: 5 } },
+          { name: '6×6', type: 'schulte', xp: 10, base: 85, params: { size: 6 } }
+        ] },
+      { id: 'k_wedge', title: 'Строчки', emoji: '📏', icon: 'wedge', pool: 'kids',
+        desc: 'Читай строчки вслух, глазки держи в центре.',
+        levels: [
+          { name: '4', type: 'wedge', xp: 5, base: 40, params: { rows: 4 } },
+          { name: '5', type: 'wedge', xp: 5, base: 42, params: { rows: 5 } },
+          { name: '6', type: 'wedge', xp: 10, base: 45, params: { rows: 6 } },
+          { name: '7', type: 'wedge', xp: 10, base: 48, params: { rows: 7 } }
+        ] },
+      { id: 'k_read', title: 'Успей прочитать', emoji: '⏱', icon: 'reader', pool: 'kids',
+        desc: 'Короткая история и таймер. Успей до нуля!',
+        levels: [
+          { name: '60', type: 'timedread', xp: 5, base: 60 },
+          { name: '50', type: 'timedread', xp: 5, base: 50 },
+          { name: '40', type: 'timedread', xp: 10, base: 40 },
+          { name: '30', type: 'timedread', xp: 10, base: 30 }
+        ] },
+      { id: 'k_rsvp', title: 'Быстрые слова', emoji: '💬', icon: 'measure', pool: 'kids',
+        desc: 'Слова мелькают в центре. Узнавай их без запинки.',
+        levels: [
+          { name: '150', type: 'rsvp', xp: 5, base: 150 },
+          { name: '180', type: 'rsvp', xp: 5, base: 180 },
+          { name: '210', type: 'rsvp', xp: 10, base: 210 },
+          { name: '240', type: 'rsvp', xp: 10, base: 240 }
+        ] }
+    ];
+  }
+
+  function renderKids() {
+    const st = A.state;
+    if (!st.train) st.train = {};
+    const games = kidsGames();
+    const stars = games.reduce((s, g) => s + Math.max(0, (st.train[g.id] || 1) - 1), 0);
+    const name = st.name ? ', ' + esc(st.name) : '';
+
+    view.innerHTML =
+      '<div class="view">' +
+      '<div class="kids-hero">' +
+        '<h1>Привет' + name + '! Будем играть в чтение</h1>' +
+        '<p>Четыре игры, в каждой четыре уровня. Прошёл уровень — открылся следующий.</p>' +
+        '<div class="kids-stars">⭐ <span>' + stars + '</span> звёзд собрано</div>' +
+      '</div>' +
+      '<div class="kids-grid">' +
+        games.map((g, i) => {
+          const unlocked = st.train[g.id] || 1;
+          return '<div class="kid-card">' +
+            '<div class="top"><span class="emoji">' + g.emoji + '</span><h3>' + esc(g.title) + '</h3></div>' +
+            '<p>' + esc(g.desc) + '</p>' +
+            '<div class="kid-levels">' + g.levels.map((lv, li) =>
+              '<button class="kid-lvl' + (li + 1 < unlocked ? ' passed' : '') + (li + 1 > unlocked ? ' locked' : '') +
+              '" data-game="' + i + '" data-lvl="' + (li + 1) + '"' + (li + 1 > unlocked ? ' disabled' : '') + '>' +
+              (li + 1 < unlocked ? '✓' : esc(lv.name)) + '</button>').join('') +
+            '</div></div>';
+        }).join('') +
+      '</div>' +
+      '<div id="kids-host" style="margin-top:20px"></div>' +
+      '</div>';
+
+    $$('.kid-lvl', view).forEach(btn => {
+      btn.addEventListener('click', () => {
+        const g = games[+btn.dataset.game];
+        const card = btn.closest('.kid-card');
+        startTrainer(g, +btn.dataset.lvl, card, +btn.dataset.game, 500);
+      });
+    });
+  }
+
+  /* -------------------------------- аудио ------------------------------ */
   let taAudio = null;
   const taState = { index: 0, playing: false, list: [] };
   const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
@@ -1103,6 +1198,30 @@
     const total = taState.list.reduce((s, x) => s + (x.dur || 0), 0);
     time.textContent = '0:00 / ' + clock(total);
 
+    const ga = $('#global-audio');
+    const gaFill = ga ? ga.querySelector('[data-ga-fill]') : null;
+    const gaTime = ga ? ga.querySelector('[data-ga-time]') : null;
+    const gaStop = ga ? ga.querySelector('[data-ga-stop]') : null;
+    const totalAll = () => taState.list.reduce((s, x) => s + (x.dur || 0), 0);
+    function gaShow(on) { if (ga) ga.hidden = !on; }
+    function gaUpdate(seg) {
+      if (!gaFill || !taAudio) return;
+      const all = totalAll() || 1;
+      const before = taState.list.slice(0, taState.index).reduce((s, x) => s + (x.dur || 0), 0);
+      const cur = before + Math.min(taAudio.currentTime || 0, seg.dur || 0);
+      gaFill.style.width = Math.min(100, cur / all * 100) + '%';
+      if (gaTime) gaTime.textContent = clock(cur) + ' / ' + clock(all);
+    }
+    if (gaStop) gaStop.addEventListener('click', () => {
+      stopAudio();
+      taSetBlock(-1);
+      taClearWords();
+      gaShow(false);
+      btn.innerHTML = PLAY_ICON;
+      fill.style.width = '0%';
+      time.textContent = '0:00 / ' + clock(totalAll());
+    });
+
     function playFrom(i, autoplay) {
       stopAudio();
       if (i < 0 || i >= taState.list.length) return;
@@ -1117,6 +1236,7 @@
       const a = new Audio('assets/audio/' + seg.src);
       taAudio = a;
       a.playbackRate = rate;
+      gaShow(true);
 
       function tickWords() {
         if (!taAudio) { taRaf = null; return; }
@@ -1142,6 +1262,7 @@
         const pct = a.duration ? a.currentTime / a.duration * 100 : 0;
         fill.style.width = pct + '%';
         time.textContent = clock(a.currentTime) + ' / ' + clock(a.duration || seg.dur);
+        gaUpdate(seg);
       });
       a.addEventListener('ended', () => {
         if (taState.index + 1 < taState.list.length) playFrom(taState.index + 1, true);
@@ -1149,8 +1270,10 @@
           taState.playing = false;
           btn.innerHTML = PLAY_ICON;
           fill.style.width = '0%';
-          time.textContent = '0:00 / ' + clock(total);
+          time.textContent = '0:00 / ' + clock(totalAll());
           taSetBlock(-1);
+          taClearWords();
+          gaShow(false);
         }
       });
       if (autoplay) {
@@ -1188,6 +1311,8 @@
       taState.list = archive[voice] || [];
       stopAudio();
       taSetBlock(-1);
+      taClearWords();
+      gaShow(false);
       fill.style.width = '0%';
       time.textContent = '0:00 / ' + clock(taState.list.reduce((s, x) => s + (x.dur || 0), 0));
       btn.innerHTML = PLAY_ICON;
@@ -1274,6 +1399,40 @@
     });
   }
 
+  function initMode() {
+    const st = A.state;
+    const btn = $('#btn-mode');
+    const lbl = btn && btn.querySelector('.mode-label');
+    const sync = () => {
+      document.body.setAttribute('data-mode', A.state.mode === 'kids' ? 'kids' : 'adult');
+      if (lbl) lbl.textContent = A.state.mode === 'kids' ? 'Взрослый' : 'Детский';
+    };
+    sync();
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const toKids = A.state.mode !== 'kids';
+      A.modal('<h3>' + (toKids ? 'Детский режим' : 'Взрослый режим') + '</h3>' +
+        '<p>' + (toKids
+          ? 'Игры без теории: числа, строчки, чтение на время и быстрые слова. Подходит для 6–12 лет.'
+          : 'Курс с теорией, практикой и проверками.') + '</p>' +
+        '<p class="muted" style="font-size:13px">Прогресс каждого режима хранится отдельно.</p>' +
+        '<div class="row"><button class="btn btn-ghost" data-close>Отмена</button>' +
+        '<button class="btn btn-primary" data-yes>Переключить</button></div>', {
+        onMount(root, close) {
+          root.querySelector('[data-yes]').addEventListener('click', () => {
+            A.state.mode = toKids ? 'kids' : 'adult';
+            if (toKids && (A.state.dailyMinutes || 20) > 15) A.state.dailyMinutes = 10;
+            A.save();
+            close();
+            sync();
+            location.hash = '#/home';
+            render();
+          });
+        }
+      });
+    });
+  }
+
   function helpModal() {
     A.modal(
       '<h3>Как устроен курс</h3>' +
@@ -1293,14 +1452,21 @@
     const chosenTheme = currentTheme();
     A.modal(
       '<h3>Настроим курс под вас</h3>' +
-      '<p class="muted" style="font-size:13px">Три быстрых вопроса. Всё можно изменить позже.</p>' +
-      '<div style="font-weight:700;font-size:14px;margin-top:6px">Как вас зовут?</div>' +
+      '<p class="muted" style="font-size:13px">Пара вопросов. Всё можно изменить позже.</p>' +
+      '<div style="font-weight:700;font-size:14px;margin-top:6px">Кто будет заниматься?</div>' +
+      '<div class="mode-cards" data-modes>' +
+        '<button type="button" class="mode-card on" data-mode="adult"><b>Взрослый 15+</b><span>теория, практика, проверки</span></button>' +
+        '<button type="button" class="mode-card" data-mode="kids"><b>Ребёнок 6–12</b><span>игры без теории</span></button>' +
+      '</div>' +
+      '<div style="font-weight:700;font-size:14px;margin-top:16px">Как вас зовут?</div>' +
       '<input class="input" id="ob-name" maxlength="24" placeholder="Например, Анна" autocomplete="off" style="margin-top:8px">' +
-      '<div style="font-weight:700;font-size:14px;margin-top:18px">Сколько времени в день готовы уделять?</div>' +
-      '<div class="choice-row" data-mins>' + mins.map(m =>
-        '<button type="button" class="choice' + (m === chosenMin ? ' on' : '') + '" data-min="' + m + '">' +
-        (m === 20 ? '20 минут' : m + ' минут') + '</button>').join('') + '</div>' +
-      '<p class="muted" style="font-size:12.5px;margin:2px 0 0">20 минут — базовая программа. Больше — добавим тренажёры и чтение с таймером.</p>' +
+      '<div data-time-block>' +
+        '<div style="font-weight:700;font-size:14px;margin-top:18px">Сколько времени в день готовы уделять?</div>' +
+        '<div class="choice-row" data-mins>' + mins.map(m =>
+          '<button type="button" class="choice' + (m === chosenMin ? ' on' : '') + '" data-min="' + m + '">' +
+          (m === 20 ? '20 минут' : m + ' минут') + '</button>').join('') + '</div>' +
+        '<p class="muted" style="font-size:12.5px;margin:2px 0 0">20 минут — базовая программа. Больше — добавим тренажёры и чтение с таймером.</p>' +
+      '</div>' +
       '<div style="font-weight:700;font-size:14px;margin-top:18px">Тема оформления</div>' +
       '<div class="theme-cards" data-themes>' +
         [['paper', '#3b6ef5', 'Бумага'], ['graphite', '#0e1014', 'Графит'], ['sand', '#a1521a', 'Тёплая']]
@@ -1312,6 +1478,18 @@
       dismissable: false,
       onMount(root, close) {
         let min = chosenMin;
+        let mode = A.state.mode === 'kids' ? 'kids' : 'adult';
+        root.querySelectorAll('[data-modes] [data-mode]').forEach(b => {
+          b.classList.toggle('on', b.dataset.mode === mode);
+          b.addEventListener('click', () => {
+            mode = b.dataset.mode;
+            root.querySelectorAll('[data-modes] [data-mode]').forEach(x => x.classList.toggle('on', x === b));
+            const tb = root.querySelector('[data-time-block]');
+            if (tb) tb.style.display = mode === 'kids' ? 'none' : '';
+          });
+        });
+        const tb = root.querySelector('[data-time-block]');
+        if (tb && mode === 'kids') tb.style.display = 'none';
         root.querySelectorAll('[data-min]').forEach(b => b.addEventListener('click', () => {
           min = +b.dataset.min;
           root.querySelectorAll('[data-min]').forEach(x => x.classList.toggle('on', x === b));
@@ -1324,12 +1502,16 @@
         inp.focus();
         const save = () => {
           const v = inp.value.trim();
-          A.state.dailyMinutes = min;
+          A.state.mode = mode;
+          A.state.dailyMinutes = mode === 'kids' ? 10 : min;
           if (v) A.state.name = v;
           A.save();
+          document.body.setAttribute('data-mode', mode === 'kids' ? 'kids' : 'adult');
+          const ml = document.querySelector('#btn-mode .mode-label');
+          if (ml) ml.textContent = mode === 'kids' ? 'Взрослый' : 'Детский';
           close();
           render();
-          A.toast('План: ' + min + ' минут в день', '', '✓');
+          A.toast(mode === 'kids' ? 'Детский режим: 10 минут в день' : 'План: ' + min + ' минут в день', '', '✓');
         };
         root.querySelector('[data-save]').addEventListener('click', save);
         root.querySelector('[data-skip]').addEventListener('click', close);
@@ -1443,6 +1625,7 @@
   A.load();
   A.renderHud();
   initTheme();
+  initMode();
   initPWA();
   if (!location.hash) location.hash = '#/home';
   window.addEventListener('hashchange', render);

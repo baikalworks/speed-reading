@@ -33,6 +33,25 @@
     } catch (e) { /* звук недоступен */ }
   }
 
+  function beep(freq, dur, gain) {
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime;
+      const o = actx.createOscillator();
+      const g = actx.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(gain || 0.06, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.1));
+      o.connect(g);
+      g.connect(actx.destination);
+      o.start(t);
+      o.stop(t + (dur || 0.1) + 0.02);
+    } catch (e) { /* без звука */ }
+  }
+
   function el(tag, cls, html) {
     const n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -133,6 +152,11 @@
         '<span class="muted" data-hint>Текст: ' + words + ' слов. Читайте в своём темпе.</span>' +
       '</div>' +
       '<div class="reader-frame" data-frame><div class="reader-text" data-text>' + textParas(txt.text) + '</div></div>' +
+      '<div class="reader-controls bottom">' +
+        '<button class="btn btn-ghost" data-pause2>Пауза</button>' +
+        '<button class="btn btn-primary" data-finish2>Готово</button>' +
+        '<button class="btn btn-ghost btn-sm" data-restart2>Заново</button>' +
+      '</div>' +
       '<div data-q></div>';
 
     const frame = body.querySelector('[data-frame]');
@@ -142,9 +166,17 @@
     const pauseBtn = body.querySelector('[data-pause]');
     const finBtn = body.querySelector('[data-finish]');
     const restartBtn = body.querySelector('[data-restart]');
+    const pause2 = body.querySelector('[data-pause2]');
+    const fin2 = body.querySelector('[data-finish2]');
+    const restart2 = body.querySelector('[data-restart2]');
     const hint = body.querySelector('[data-hint]');
     const initialHint = hint.textContent;
     let elapsed = 0, startedAt = 0, running = false, tick = null, done = false;
+
+    function syncBottom() {}
+    if (pause2) pause2.addEventListener('click', () => pauseBtn.click());
+    if (fin2) fin2.addEventListener('click', () => finBtn.click());
+    if (restart2) restart2.addEventListener('click', () => restartBtn.click());
 
     const shown = () => elapsed + (running ? (performance.now() - startedAt) / 1000 : 0);
 
@@ -326,6 +358,11 @@
         '<div class="count-badge">Считайте про себя: <span class="n" data-count>1</span></div>'
       ) : '') +
       '<div class="reader-frame" data-frame><div class="reader-text" data-text>' + textHTML + '</div></div>' +
+      '<div class="reader-controls bottom">' +
+        '<button class="btn btn-ghost" data-pause3>Пауза</button>' +
+        '<button class="btn btn-primary" data-finish3>Готово</button>' +
+        '<button class="btn btn-ghost btn-sm" data-restart3>Заново</button>' +
+      '</div>' +
       '<div data-returns></div>' +
       '<div data-q></div>';
 
@@ -336,6 +373,12 @@
     const pauseBtn = body.querySelector('[data-pause]');
     const finBtn = body.querySelector('[data-finish]');
     const restartBtn = body.querySelector('[data-restart]');
+    const pause3 = body.querySelector('[data-pause3]');
+    const fin3 = body.querySelector('[data-finish3]');
+    const restart3 = body.querySelector('[data-restart3]');
+    if (pause3) pause3.addEventListener('click', () => pauseBtn.click());
+    if (fin3) fin3.addEventListener('click', () => finBtn.click());
+    if (restart3) restart3.addEventListener('click', () => restartBtn.click());
     let elapsed = 0, startedAt = 0, running = false, tick = null, countTick = null, done = false;
     let beatStart = null, beatStop = null;
 
@@ -519,7 +562,7 @@
     const flat = String(txt.text).split(/\n+/).filter(Boolean)
       .reduce((acc, par) => acc.concat(par.trim().split(/\s+/)), []);
     const total = flat.length;
-    const chunk = mode === 'pacer' ? (wpm < 300 ? 2 : (wpm < 380 ? 3 : 4)) : 1;
+    const chunk = p.chunk || (mode === 'pacer' ? (wpm < 300 ? 2 : (wpm < 380 ? 3 : 4)) : 1);
     const stepMs = chunk / wpm * 60000;
 
     let ptr = 0, running = false, done = false, elapsed = 0, startAt = 0;
@@ -664,7 +707,7 @@
     const timerEl = body.querySelector('[data-timer]');
     const startBtn = body.querySelector('[data-start]');
     const restartBtn = body.querySelector('[data-restart]');
-    let t0 = 0, tick = null, finished = false;
+    let t0 = 0, tick = null, finished = false, lastBeep = 99;
 
     restartBtn.addEventListener('click', () => {
       clearInterval(tick);
@@ -684,6 +727,11 @@
         const left = Math.max(0, limit - (performance.now() - t0) / 1000);
         timerEl.textContent = fmtTime(left);
         timerEl.classList.toggle('danger', left <= 5);
+        const secLeft = Math.ceil(left);
+        if (left <= 5 && secLeft !== lastBeep) {
+          lastBeep = secLeft;
+          if (secLeft > 0) beep(secLeft === 1 ? 1200 : 880, 0.09, 0.05);
+        }
         if (left <= 0) finish(true);
       }, 100);
       timers.push(tick);
@@ -733,13 +781,15 @@
     const total = n * n;
     const rounds = p.rounds || 1;
     const target = p.targetSec || 60;
+    const limit = p.countdown || 0;
 
     body.innerHTML =
       '<div class="schulte-wrap">' +
         '<div><div class="schulte" data-grid style="grid-template-columns:repeat(' + n + ',1fr)"></div></div>' +
         '<div class="schulte-side">' +
           '<div class="lbl">Раунд</div><div class="big" data-round>1 / ' + rounds + '</div>' +
-          '<div class="lbl" style="margin-top:14px">Время</div><div class="big" data-time>00:00</div>' +
+          '<div class="lbl" style="margin-top:14px">' + (limit ? 'Осталось' : 'Время') + '</div>' +
+          '<div class="big" data-time>' + (limit ? fmtTime(limit) : '00:00') + '</div>' +
           '<div class="lbl" style="margin-top:14px">Лучший</div><div class="big" data-best>—</div>' +
           '<div class="schulte-next">Ищите: <b data-next>1</b></div>' +
           '<p class="muted" style="font-size:12.5px;margin-top:14px">Держите взгляд в центре. Голову не поворачивайте.</p>' +
@@ -773,7 +823,17 @@
       roundEl.textContent = round + ' / ' + rounds;
       t0 = performance.now();
       clearInterval(tick);
-      tick = every(() => { timeEl.textContent = fmtTime((performance.now() - t0) / 1000); }, 200);
+      timeEl.classList.remove('danger');
+      tick = every(() => {
+        if (limit) {
+          const left = Math.max(0, limit - (performance.now() - t0) / 1000);
+          timeEl.textContent = fmtTime(left);
+          timeEl.classList.toggle('danger', left <= 5);
+          if (left <= 0 && started) finishAll(limit, true);
+        } else {
+          timeEl.textContent = fmtTime((performance.now() - t0) / 1000);
+        }
+      }, 200);
       timers.push(tick);
     }
 
@@ -810,9 +870,23 @@
       }
     });
 
-    function finishAll(lastSec) {
+    function finishAll(lastSec, timeout) {
       started = false;
       A.wake.release();
+      clearInterval(tick);
+      timeEl.classList.remove('danger');
+      if (timeout) {
+        bestEl.textContent = limit + ' с';
+        resultBox(body, {
+          tone: 'lose',
+          title: 'Время вышло',
+          nums: [{ v: limit + ' с', l: 'лимит' }, { v: errors, l: 'ошибок' }],
+          msg: 'Не успели найти все числа. Попробуйте ещё раз или начните с уровня проще.'
+        });
+        ctx.complete({ seconds: limit, errors: errors, valid: false, timeout: true }, ex, {});
+        msg.innerHTML = '';
+        return;
+      }
       const best = Math.min.apply(null, times);
       const avg = times.reduce((a, b) => a + b, 0) / times.length;
       const valid = best >= 2; // защита от случайных/автоматических кликов
@@ -873,7 +947,7 @@
     const restartBtn = body.querySelector('[data-restart]');
     const dot = body.querySelector('[data-dot]');
     const dotBtn = body.querySelector('[data-dot-toggle]');
-    let t0 = 0, tick = null, finished = false;
+    let t0 = 0, tick = null, finished = false, lastBeep = 99;
 
     dotBtn.addEventListener('click', () => {
       dot.hidden = !dot.hidden;

@@ -749,3 +749,62 @@ button,.opt,.day,label{touch-action:manipulation}
 
 .brand-ver{display:block;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.08em;
   color:var(--muted);margin-top:2px;text-transform:uppercase}
+
+/* режим обучения */
+.mode-btn{width:auto;padding:0 10px;display:inline-flex;align-items:center;gap:6px;border-radius:999px}
+.mode-label{font-size:12.5px;font-weight:700}
+@media (max-width:1100px){.mode-label{display:none}.mode-btn{padding:0;width:32px;justify-content:center}}
+.mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0 4px}
+.mode-card{display:flex;flex-direction:column;gap:4px;padding:14px;border:1px solid var(--line);border-radius:12px;
+  background:var(--panel);text-align:left;cursor:pointer;color:var(--ink)}
+.mode-card.on{border-color:var(--accent);background:var(--accent-soft)}
+.mode-card b{font-size:14.5px}
+.mode-card span{font-size:12px;color:var(--muted)}
+
+/* детский режим */
+body[data-mode="kids"] .mainnav{display:none}
+body[data-mode="kids"] .hud-xp{display:none}
+.kids-hero{border-radius:22px;padding:26px 28px;margin-bottom:18px;
+  background:linear-gradient(135deg,#ffe9c9,#e9f2ff 60%,#e6fbef);border:1px solid #f0e2cf}
+body[data-theme="graphite"] .kids-hero{background:linear-gradient(135deg,#2a2214,#1b2437 60%,#12231e);border-color:var(--line)}
+.kids-hero h1{font-size:32px;margin-bottom:6px}
+.kids-hero p{margin:0;color:#5a5142;font-size:15px}
+body[data-theme="graphite"] .kids-hero p{color:var(--muted)}
+.kids-stars{display:inline-flex;align-items:center;gap:8px;margin-top:14px;background:rgba(255,255,255,.7);
+  border-radius:999px;padding:6px 14px;font-weight:800;font-size:14px}
+body[data-theme="graphite"] .kids-stars{background:rgba(255,255,255,.08)}
+.kids-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.kid-card{border-radius:18px;padding:18px;background:var(--panel);border:1px solid var(--line);
+  display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 24px -20px rgba(0,0,0,.4)}
+.kid-card .top{display:flex;align-items:center;gap:10px}
+.kid-card h3{font-size:18px}
+.kid-card p{font-size:13px;color:var(--muted);margin:0}
+.kid-levels{display:flex;gap:8px}
+.kid-lvl{width:44px;height:44px;border-radius:14px;border:1px solid var(--line);font-size:17px;font-weight:800;
+  background:var(--soft);color:var(--muted);cursor:pointer}
+.kid-lvl.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-2)}
+.kid-lvl.passed{background:var(--green-soft);border-color:#bfe7d8;color:#0b6b51}
+.kid-lvl.locked{opacity:.4;cursor:not-allowed}
+.kid-card .emoji{font-size:26px;line-height:1}
+
+/* закреплённая полоса озвучки */
+.topbar{flex-wrap:wrap}
+.global-audio{flex-basis:100%;display:flex;align-items:center;gap:12px;margin-top:8px;
+  padding:6px 10px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--line)}
+.global-audio[hidden]{display:none}
+.ga-title{font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-2)}
+.ga-bar{flex:1;height:5px;border-radius:3px;background:color-mix(in srgb, var(--accent) 18%, transparent);overflow:hidden}
+.ga-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.ga-time{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ga-stop{border:0;background:var(--accent);color:#fff;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer}
+
+/* мобильная вёрстка тренажёров */
+.ex-body{overflow-x:auto}
+.wedge-wrap{max-width:100%;overflow-x:auto}
+.wedge-row{max-width:100%}
+.schulte{max-width:100%}
+@media (max-width:520px){
+  .wedge-row{font-size:15px;letter-spacing:.18em;padding:6px 10px}
+  .schulte{gap:6px}
+  .reader-controls.bottom{position:sticky;bottom:0;background:var(--panel);padding:10px 0 4px;z-index:5}
+}
