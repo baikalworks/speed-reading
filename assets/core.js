@@ -4,7 +4,7 @@
 
   const COURSE = window.COURSE;
   const KEY = 'speedread14_v1';
-  const VERSION = '1.7.0';
+  const VERSION = '1.7.1';
   const VERSION_DATE = '24.11.2026';
 
   const RANKS = COURSE.ranks;
@@ -254,6 +254,8 @@
     const r = rankOf(state.xp);
     const rankEl = $('#hud-rank'), xpEl = $('#hud-xp'), barEl = $('#hud-bar'), st = $('#hud-streak');
     if (!rankEl) return;
+    const bv = $('#brand-version');
+    if (bv) bv.textContent = 'v' + VERSION;
     rankEl.textContent = r.name;
     xpEl.textContent = fmtNum(state.xp) + ' XP';
     barEl.style.width = r.progress + '%';
