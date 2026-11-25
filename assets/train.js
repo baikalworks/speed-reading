@@ -857,6 +857,163 @@
     });
   }
 
+  /* ------------------------- лишнее предложение ----------------------- */
+  function odd(body, ex, ctx) {
+    const p = ex.params;
+    const txt = p.randomText ? pickRandomText() : A.COURSE.texts[p.textKey];
+    const others = Object.keys(A.COURSE.texts).filter(k => A.COURSE.texts[k].text !== txt.text);
+    const other = A.COURSE.texts[others[Math.floor(Math.random() * others.length)]];
+    const sents = (String(txt.text).match(/[^.!?]+[.!?]+/g) || [txt.text]).map(s => s.trim()).filter(Boolean);
+    const picked = sents.slice(0, 6);
+    const alienPool = (String(other.text).match(/[^.!?]+[.!?]+/g) || []).map(s => s.trim());
+    const alien = alienPool[Math.floor(Math.random() * alienPool.length)] || 'Это предложение не относится к тексту.';
+    const pos = Math.floor(Math.random() * (picked.length + 1));
+    const list = picked.slice();
+    list.splice(pos, 0, alien);
+
+    body.innerHTML =
+      '<div class="reader-controls">' +
+        '<div class="timer" data-timer>00:00</div>' +
+        '<span class="muted">Найдите предложение, которое не относится к тексту.</span>' +
+      '</div>' +
+      '<div class="panel panel-pad odd-list" data-list>' +
+        list.map((s, i) => '<p class="odd-sent" data-i="' + i + '">' + esc(s) + '</p>').join('') +
+      '</div>' +
+      '<div data-res></div>';
+
+    const t0 = performance.now();
+    let done = false, wrong = 0;
+    const tick = every(() => { const el = body.querySelector('[data-timer]'); if (el) el.textContent = fmtTime((performance.now() - t0) / 1000); }, 200);
+    timers.push(tick);
+
+    body.querySelectorAll('.odd-sent').forEach(el => el.addEventListener('click', () => {
+      if (done) return;
+      const i = +el.dataset.i;
+      if (i === pos) {
+        done = true;
+        clearInterval(tick);
+        el.classList.add('ok');
+        const sec = (performance.now() - t0) / 1000;
+        resultBox(body.querySelector('[data-res]'), {
+          tone: 'win',
+          title: 'Нашли лишнее',
+          nums: [{ v: sec.toFixed(1) + ' с', l: 'время' }, { v: wrong, l: 'промахов' }],
+          msg: 'Чужое предложение выбивается по смыслу. Такой навык помогает быстро отбрасывать лишнее при чтении.'
+        });
+        ctx.complete({ seconds: +sec.toFixed(1), errors: wrong, pass: true }, ex, {});
+      } else {
+        wrong++;
+        el.classList.add('bad');
+        setTimeout(() => el.classList.remove('bad'), 500);
+      }
+    }));
+  }
+
+  /* --------------------------- порядок частей ------------------------- */
+  function order(body, ex, ctx) {
+    const p = ex.params;
+    const txt = p.randomText ? pickRandomText() : A.COURSE.texts[p.textKey];
+    const sents = (String(txt.text).match(/[^.!?]+[.!?]+/g) || [txt.text]).map(s => s.trim()).filter(Boolean);
+    const parts = [];
+    const per = Math.max(1, Math.ceil(sents.length / 4));
+    for (let i = 0; i < sents.length; i += per) parts.push(sents.slice(i, i + per).join(' '));
+    const correct = parts.slice(0, 4);
+    const shuffled = correct.map((s, i) => ({ s: s, i: i })).sort(() => Math.random() - 0.5);
+
+    body.innerHTML =
+      '<div class="reader-controls"><span class="muted">Соберите части текста в правильном порядке.</span></div>' +
+      '<div class="panel panel-pad" data-parts>' +
+        shuffled.map((o, k) => '<button class="order-item" data-k="' + k + '" data-i="' + o.i + '">' + esc(o.s) + '</button>').join('') +
+      '</div>' +
+      '<div class="panel panel-pad" style="margin-top:10px"><b style="font-size:13px">Ваш порядок</b><div data-picked style="margin-top:6px"></div></div>' +
+      '<div data-res></div>';
+
+    const picked = [];
+    const host = body.querySelector('[data-picked]');
+    body.querySelectorAll('.order-item').forEach(btn => btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.classList.add('used');
+      picked.push(+btn.dataset.i);
+      host.innerHTML = picked.map((i, n) => '<span class="order-chip">' + (n + 1) + '</span>').join('');
+      if (picked.length === correct.length) {
+        const ok = picked.every((v, i) => v === i);
+        resultBox(body.querySelector('[data-res]'), {
+          tone: ok ? 'win' : '',
+          title: ok ? 'Порядок верный' : 'Порядок другой',
+          nums: [{ v: correct.length, l: 'частей' }],
+          msg: ok ? 'Структура текста собрана правильно.' : 'Попробуйте ещё раз: части идут по смыслу, от общего к частному.'
+        });
+        ctx.complete({ seconds: 0, pass: ok }, ex, {});
+      }
+    }));
+  }
+
+  /* --------------------------- счётчик возвратов ---------------------- */
+  function tally(body, ex, ctx) {
+    const p = ex.params;
+    const txt = p.randomText ? pickRandomText() : A.COURSE.texts[p.textKey];
+    const words = wc(txt.text);
+
+    body.innerHTML =
+      '<div class="reader-controls">' +
+        '<button class="btn btn-primary" data-start>Старт</button>' +
+        '<button class="btn btn-ghost" data-finish disabled>Готово</button>' +
+        '<button class="btn btn-ghost btn-sm" data-restart>Заново</button>' +
+        '<div class="timer" data-timer>00:00</div>' +
+      '</div>' +
+      '<div class="reader-frame" data-frame><div class="reader-text" data-text>' + textParas(txt.text) + '</div></div>' +
+      '<div class="tally-bar"><button class="btn btn-ghost" data-ret>Я вернулся назад · <b data-n>0</b></button>' +
+        '<span class="muted" style="font-size:12.5px">Каждый возврат — плюс один. Цель: ноль.</span></div>' +
+      '<div data-res></div>';
+
+    let t0 = 0, tick = null, returns = 0, started = false, done = false;
+    const nEl = body.querySelector('[data-n]');
+    const startBtn = body.querySelector('[data-start]');
+    const finBtn = body.querySelector('[data-finish]');
+
+    startBtn.addEventListener('click', () => {
+      started = true; returns = 0; done = false;
+      nEl.textContent = '0';
+      t0 = performance.now();
+      startBtn.disabled = true; finBtn.disabled = false;
+      A.wake.request();
+      tick = every(() => { body.querySelector('[data-timer]').textContent = fmtTime((performance.now() - t0) / 1000); }, 200);
+      timers.push(tick);
+    });
+
+    body.querySelector('[data-ret]').addEventListener('click', () => {
+      if (!started || done) return;
+      returns++;
+      nEl.textContent = returns;
+    });
+
+    body.querySelector('[data-restart]').addEventListener('click', () => {
+      clearInterval(tick); A.wake.release(); body.innerHTML = ''; tally(body, ex, ctx);
+    });
+
+    finBtn.addEventListener('click', () => {
+      if (!started || done) return;
+      done = true;
+      clearInterval(tick);
+      A.wake.release();
+      const sec = Math.max(1, (performance.now() - t0) / 1000);
+      const wpm = Math.round(words / (sec / 60));
+      body.querySelector('[data-text]').classList.add('hidden');
+      resultBox(body.querySelector('[data-res]'), {
+        tone: returns === 0 ? 'win' : '',
+        title: returns === 0 ? 'Без возвратов' : 'Возвраты есть',
+        nums: [
+          { v: wpm, l: 'слов/мин' },
+          { v: returns, l: 'возвратов' },
+          { v: sec.toFixed(0) + ' с', l: 'время' }
+        ],
+        msg: returns === 0 ? 'Один проход, ноль возвратов — именно так читают быстро.' : 'Возвраты — привычка. В следующий раз попробуйте дочитать до конца, даже если смысл ускользает.'
+      });
+      ctx.complete({ wpm: wpm, returns: returns, pass: returns === 0, seconds: Math.round(sec) }, ex, {});
+    });
+  }
+
   /* ------------------------------ schulte ----------------------------- */
   function schulte(body, ex, ctx) {
     const p = ex.params;
@@ -1348,7 +1505,7 @@
   }
 
   window.Train = {
-    measure, reader, timedread, mask, schulte, wedge, scan, recall, flexmatch, checklist, reflection,
+    measure, reader, timedread, mask, odd, order, tally, schulte, wedge, scan, recall, flexmatch, checklist, reflection,
     askQuestions, stopAll, resultBox, textParas
   };
 })();

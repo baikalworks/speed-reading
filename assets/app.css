@@ -816,3 +816,15 @@ body[data-theme="graphite"] .kids-stars{background:rgba(255,255,255,.08)}
 .mask-frame:before{top:0;background:linear-gradient(180deg,var(--panel),transparent)}
 .mask-frame:after{bottom:0;background:linear-gradient(0deg,var(--panel),transparent)}
 .mask-frame .reader-text{padding:14px 0}
+
+/* лишнее предложение и порядок частей */
+.odd-sent{cursor:pointer;border-radius:8px;padding:6px 8px;transition:background .15s}
+.odd-sent:hover{background:var(--soft)}
+.odd-sent.ok{background:var(--green-soft);color:#0b6b51}
+.odd-sent.bad{background:#fde7e4;color:#a12a20}
+.order-item{display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;background:var(--soft);color:var(--ink);font-size:14px;line-height:1.5;cursor:pointer}
+.order-item.used{opacity:.45;text-decoration:line-through}
+.order-chip{display:inline-flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:8px;
+  background:var(--accent-soft);color:var(--accent-2);font-weight:800;margin-right:6px}
+.tally-bar{display:flex;align-items:center;gap:12px;margin:10px 0;flex-wrap:wrap}
