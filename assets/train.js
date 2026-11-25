@@ -631,6 +631,95 @@
     });
   }
 
+  /* ----------------------------- timed read --------------------------- */
+  function timedread(body, ex, ctx) {
+    const p = ex.params;
+    const txt = A.COURSE.texts[p.textKey];
+    const limit = p.seconds || 60;
+    const words = wc(txt.text);
+    const qs = p.questions || [];
+
+    body.innerHTML =
+      '<div class="reader-controls">' +
+        '<button class="btn btn-primary" data-start>Старт · ' + limit + ' с</button>' +
+        '<button class="btn btn-ghost" data-restart>Заново</button>' +
+        '<div class="timer" data-timer>' + fmtTime(limit) + '</div>' +
+        '<span class="muted">Успейте прочитать текст до нуля. Время тает — читайте быстрее.</span>' +
+      '</div>' +
+      '<div class="reader-frame" data-frame><div class="reader-text" data-text>' + textParas(txt.text) + '</div></div>' +
+      '<div data-q></div>';
+
+    const frame = body.querySelector('[data-frame]');
+    const textEl = body.querySelector('[data-text]');
+    const timerEl = body.querySelector('[data-timer]');
+    const startBtn = body.querySelector('[data-start]');
+    const restartBtn = body.querySelector('[data-restart]');
+    let t0 = 0, tick = null, finished = false;
+
+    restartBtn.addEventListener('click', () => {
+      clearInterval(tick);
+      A.wake.release();
+      body.innerHTML = '';
+      timedread(body, ex, ctx);
+    });
+
+    startBtn.addEventListener('click', () => {
+      t0 = performance.now();
+      finished = false;
+      A.wake.request();
+      startBtn.disabled = true;
+      frame.scrollTop = 0;
+      timerEl.classList.remove('danger');
+      tick = every(() => {
+        const left = Math.max(0, limit - (performance.now() - t0) / 1000);
+        timerEl.textContent = fmtTime(left);
+        timerEl.classList.toggle('danger', left <= 5);
+        if (left <= 0) finish(true);
+      }, 100);
+      timers.push(tick);
+    });
+
+    function finish(timeout) {
+      if (finished) return;
+      finished = true;
+      clearInterval(tick);
+      A.wake.release();
+      const sec = Math.min(limit, (performance.now() - t0) / 1000);
+      timerEl.classList.remove('danger');
+      timerEl.textContent = fmtTime(Math.max(0, limit - sec));
+      textEl.classList.add('hidden');
+      startBtn.disabled = true;
+      const qhost = body.querySelector('[data-q]');
+
+      if (timeout) {
+        resultBox(body, {
+          tone: 'lose',
+          title: 'Время вышло',
+          nums: [{ v: limit + ' с', l: 'лимит' }, { v: Math.round(words / (sec / 60)), l: 'темп' }],
+          msg: 'Не успели дочитать — попробуйте ещё раз или отключите ускорение.'
+        });
+        ctx.complete({ wpm: Math.round(words / (sec / 60)), comp: 0, pass: false, timeout: true, seconds: Math.round(sec) }, ex, {});
+        return;
+      }
+
+      askQuestions(qhost, qs, (res) => {
+        const comp = qs.length ? pct(res.score, res.total) : 100;
+        const wpm = Math.round(words / (sec / 60));
+        resultBox(body, {
+          tone: comp >= 70 ? 'win' : '',
+          title: 'Успели',
+          nums: [
+            { v: wpm, l: 'слов/мин' },
+            { v: comp + '%', l: 'понимание' },
+            { v: (limit - sec).toFixed(1) + ' с', l: 'запас' }
+          ],
+          msg: comp >= 70 ? 'Прочитано с пониманием. В следующий раз времени будет меньше.' : 'Скорость есть, понимание просело — читайте чуть медленнее.'
+        });
+        ctx.complete({ wpm: wpm, comp: comp, pass: comp >= 70, seconds: Math.round(sec) }, ex, {});
+      });
+    }
+  }
+
   /* ------------------------------ schulte ----------------------------- */
   function schulte(body, ex, ctx) {
     const p = ex.params;
@@ -752,64 +841,114 @@
     const p = ex.params;
     const rows = p.rows || 7;
     const target = p.targetSec || 35;
-    let html = '<div class="wedge">';
-    const vals = [];
+    const limit = p.limit || 0;
+    let rowsHTML = '';
     for (let i = 0; i < rows; i++) {
       const len = i + 3;
       const s = Array.from({ length: len }, () => (Math.random() * 10) | 0).join('');
-      vals.push(s);
-      html += '<div class="wedge-row">' + s.split('').join(' ') + '</div>';
+      rowsHTML += '<div class="wedge-row">' + s.split('').join(' ') + '</div>';
     }
-    html += '</div>';
 
     body.innerHTML =
       '<div class="reader-controls">' +
         '<button class="btn btn-primary" data-start>Старт</button>' +
         '<button class="btn btn-ghost" data-finish disabled>Готово</button>' +
-        '<div class="timer" data-timer>00:00</div>' +
-        '<span class="muted">Читайте вслух, взгляд — в центр строки.</span>' +
-      '</div>' + html + '<div data-res></div>';
+        '<button class="btn btn-ghost btn-sm" data-restart>Заново</button>' +
+        '<button class="btn btn-ghost btn-sm" data-dot-toggle>Точка фокуса</button>' +
+        '<div class="timer" data-timer>' + (limit ? fmtTime(limit) : '00:00') + '</div>' +
+        '<span class="muted">Взгляд — в центр строки.</span>' +
+      '</div>' +
+      '<div class="wedge-wrap"><span class="focus-dot" data-dot hidden></span><div class="wedge">' + rowsHTML + '</div></div>' +
+      '<div data-res></div>';
 
     const timerEl = body.querySelector('[data-timer]');
     const startBtn = body.querySelector('[data-start]');
     const finBtn = body.querySelector('[data-finish]');
-    let t0 = 0, tick = null;
+    const restartBtn = body.querySelector('[data-restart]');
+    const dot = body.querySelector('[data-dot]');
+    const dotBtn = body.querySelector('[data-dot-toggle]');
+    let t0 = 0, tick = null, finished = false;
+
+    dotBtn.addEventListener('click', () => {
+      dot.hidden = !dot.hidden;
+      dotBtn.classList.toggle('btn-primary', !dot.hidden);
+      dotBtn.classList.toggle('btn-ghost', dot.hidden);
+    });
+
+    function timeLeft() { return limit ? Math.max(0, limit - (performance.now() - t0) / 1000) : (performance.now() - t0) / 1000; }
 
     startBtn.addEventListener('click', () => {
       t0 = performance.now();
+      finished = false;
       A.wake.request();
-      startBtn.disabled = true; finBtn.disabled = false;
-      tick = every(() => { timerEl.textContent = fmtTime((performance.now() - t0) / 1000); }, 200);
+      startBtn.disabled = true;
+      finBtn.disabled = false;
+      timerEl.classList.remove('danger');
+      tick = every(() => {
+        const left = timeLeft();
+        timerEl.textContent = limit ? fmtTime(left) : fmtTime(left);
+        if (limit) {
+          timerEl.classList.toggle('danger', left <= 5);
+          if (left <= 0) finish(true);
+        }
+      }, 200);
       timers.push(tick);
     });
 
-    finBtn.addEventListener('click', () => {
+    restartBtn.addEventListener('click', () => {
       clearInterval(tick);
       A.wake.release();
-      finBtn.disabled = true; startBtn.disabled = true;
-      const sec = (performance.now() - t0) / 1000;
-      timerEl.textContent = fmtTime(sec);
+      body.innerHTML = '';
+      wedge(body, ex, ctx);
+    });
+
+    finBtn.addEventListener('click', () => finish(false));
+
+    function finish(timeout) {
+      if (finished) return;
+      finished = true;
+      clearInterval(tick);
+      A.wake.release();
+      finBtn.disabled = true;
+      startBtn.disabled = true;
+      timerEl.classList.remove('danger');
+      const sec = Math.min(limit || 9999, (performance.now() - t0) / 1000);
+      timerEl.textContent = fmtTime(limit ? Math.max(0, limit - sec) : sec);
       const res = body.querySelector('[data-res]');
+
+      if (timeout) {
+        res.innerHTML = '';
+        resultBox(res, {
+          tone: 'lose',
+          title: 'Время вышло',
+          nums: [{ v: limit + ' с', l: 'лимит' }],
+          msg: 'Не успели — это нормально на первом уровне. Попробуйте заново или уменьшите сложность.'
+        });
+        ctx.complete({ seconds: limit, ok: false, timeout: true }, ex, {});
+        return;
+      }
+
       res.innerHTML = '<div class="callout"><b>Самопроверка</b>Прочитали все строки без ошибок и остановок внутри строки?</div>' +
         '<div style="display:flex;gap:8px;margin-bottom:6px"><button class="btn btn-primary btn-sm" data-ok="1">Да</button>' +
         '<button class="btn btn-ghost btn-sm" data-ok="0">Были ошибки</button></div>';
       res.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', () => {
         const ok = b.dataset.ok === '1';
+        const pass = ok && (!limit || sec <= limit);
         res.innerHTML = '';
         resultBox(res, {
-          tone: ok && sec <= target ? 'win' : '',
+          tone: pass ? 'win' : '',
           title: ok ? 'Чистое чтение' : 'Есть над чем работать',
           nums: [
             { v: sec.toFixed(1) + ' с', l: 'время' },
-            { v: target + ' с', l: 'норматив' }
+            { v: (limit || target) + ' с', l: 'норматив' }
           ],
           msg: ok
-            ? 'Строки прочитаны без остановок внутри — захват расширяется. Повторите завтра.'
-            : 'Ошибки внутри строки — норма для начала. Держите взгляд в центре и не помогайте себе головой.'
+            ? 'Строки прочитаны без остановок внутри — захват расширяется.'
+            : 'Ошибки внутри строки — норма для начала. Держите взгляд в центре и включите точку фокуса.'
         });
-        ctx.complete({ seconds: +sec.toFixed(1), ok: ok }, ex, {});
+        ctx.complete({ seconds: +sec.toFixed(1), ok: ok, pass: pass }, ex, {});
       }));
-    });
+    }
   }
 
   /* -------------------------------- scan ------------------------------ */
@@ -1046,7 +1185,7 @@
   }
 
   window.Train = {
-    measure, reader, schulte, wedge, scan, recall, flexmatch, checklist, reflection,
+    measure, reader, timedread, schulte, wedge, scan, recall, flexmatch, checklist, reflection,
     askQuestions, stopAll, resultBox, textParas
   };
 })();

@@ -806,76 +806,189 @@
     $('[data-reset]', view).addEventListener('click', confirmReset);
   }
 
-  /* ------------------------------- тренажёр ---------------------------- */
-  function trainers() {
-    const qAttention = C.lessons[0].exercises[0].params.questions;
-    const qScan = C.lessons[5].exercises[0].params.questions;
+    /* ------------------------------- тренажёр ---------------------------- */
+  const TRAIN_STATE = () => ({
+    train: { schulte: 1, wedge: 1, read: 1, rsvp: 1 },
+    trainBoost: { schulte: 1, wedge: 1, read: 1, rsvp: 1 },
+    trainAccel: false
+  });
+
+  function trainTracks() {
+    const qA = C.lessons[0].exercises[0].params.questions;
     return [
-      { id: 'schulte5', title: 'Таблица Шульте 5×5', desc: 'Периферийное внимание и скорость поиска. Держите взгляд в центре.', type: 'schulte', xp: 20, min: '1 мин', params: { size: 5, rounds: 1, targetSec: 55 } },
-      { id: 'schulte6', title: 'Таблица Шульте 6×6', desc: 'Больше чисел — шире захват. Не поворачивайте голову.', type: 'schulte', xp: 30, min: '2 мин', params: { size: 6, rounds: 1, targetSec: 90 } },
-      { id: 'wedge', title: 'Клиновидные строки', desc: 'Расширение захвата строки: взгляд в центре, края — периферией.', type: 'wedge', xp: 20, min: '1 мин', params: { rows: 7, targetSec: 35 } },
-      { id: 'rsvp350', title: 'RSVP · 350 слов/мин', desc: 'Узнавание слов в темпе выше привычного, без возвратов.', type: 'reader', xp: 20, min: '2 мин', params: { textKey: 'attention', mode: 'rsvp', wpm: 350, questions: qAttention } },
-      { id: 'rsvp500', title: 'RSVP · 500 слов/мин', desc: 'Проверка предела: на каком темпе рассыпается понимание.', type: 'reader', xp: 20, min: '2 мин', params: { textKey: 'attention', mode: 'rsvp', wpm: 500, questions: qAttention } },
-      { id: 'scan', title: 'Сканирование за 60 секунд', desc: 'Поиск фактов в плотном документе: сроки, имена, цифры.', type: 'scan', xp: 20, min: '1 мин', params: { textKey: 'doc_schedule', seconds: 60, questions: qScan } }
+      { id: 'schulte', title: 'Таблица Шульте', icon: 'schulte',
+        desc: 'Находите числа по порядку. Взгляд держите в центре, голову не поворачивайте.',
+        levels: [
+          { name: '3×3', type: 'schulte', xp: 10, base: 25, params: { size: 3 } },
+          { name: '4×4', type: 'schulte', xp: 15, base: 35, params: { size: 4 } },
+          { name: '5×5', type: 'schulte', xp: 20, base: 50, params: { size: 5 } },
+          { name: '6×6', type: 'schulte', xp: 25, base: 75, params: { size: 6 } }
+        ] },
+      { id: 'wedge', title: 'Клин', icon: 'wedge',
+        desc: 'Читайте строки вслух, взгляд в центре. Включите точку фокуса, если взгляд соскакивает.',
+        levels: [
+          { name: '5', type: 'wedge', xp: 10, base: 30, params: { rows: 5 } },
+          { name: '6', type: 'wedge', xp: 15, base: 32, params: { rows: 6 } },
+          { name: '7', type: 'wedge', xp: 20, base: 35, params: { rows: 7 } },
+          { name: '8', type: 'wedge', xp: 25, base: 38, params: { rows: 8 } }
+        ] },
+      { id: 'read', title: 'Чтение на время', icon: 'reader',
+        desc: 'Текст и таймер на убывание. Последние 5 секунд таймер краснеет и мигает.',
+        levels: [
+          { name: '90', type: 'timedread', xp: 15, base: 90, params: { textKey: 'attention', questions: qA } },
+          { name: '75', type: 'timedread', xp: 20, base: 75, params: { textKey: 'attention', questions: qA } },
+          { name: '60', type: 'timedread', xp: 25, base: 60, params: { textKey: 'attention', questions: qA } },
+          { name: '45', type: 'timedread', xp: 30, base: 45, params: { textKey: 'attention', questions: qA } }
+        ] },
+      { id: 'rsvp', title: 'RSVP', icon: 'measure',
+        desc: 'Слова в центре экрана. Узнавайте без проговаривания, потом проверьте понимание.',
+        levels: [
+          { name: '250', type: 'rsvp', xp: 15, base: 250, params: { textKey: 'attention', questions: qA } },
+          { name: '300', type: 'rsvp', xp: 20, base: 300, params: { textKey: 'attention', questions: qA } },
+          { name: '350', type: 'rsvp', xp: 25, base: 350, params: { textKey: 'attention', questions: qA } },
+          { name: '400', type: 'rsvp', xp: 30, base: 400, params: { textKey: 'attention', questions: qA } }
+        ] }
     ];
   }
 
+  function trainEff(spec, track) {
+    const boost = A.state.trainBoost[track.id] || 1;
+    if (spec.type === 'rsvp') return Math.round(spec.base / boost);
+    return Math.max(8, Math.round(spec.base * boost));
+  }
+
+  function trainParams(spec, eff) {
+    if (spec.type === 'schulte') return { size: spec.params.size, rounds: 1, targetSec: eff };
+    if (spec.type === 'wedge') return { rows: spec.params.rows, limit: eff, targetSec: eff };
+    if (spec.type === 'timedread') return { textKey: spec.params.textKey, seconds: eff, questions: spec.params.questions };
+    return { textKey: spec.params.textKey, mode: 'rsvp', wpm: eff, questions: spec.params.questions };
+  }
+
+  function trackUnlocked(track) { return A.state.train[track.id] || 1; }
+
+  function refreshTrackCard(card, track) {
+    const unlocked = trackUnlocked(track);
+    card.querySelectorAll('.lvl').forEach(b => {
+      const L = +b.dataset.lvl;
+      b.classList.toggle('passed', L < unlocked);
+      b.classList.toggle('locked', L > unlocked);
+      b.disabled = L > unlocked;
+    });
+    const bl = card.querySelector('[data-boost]');
+    if (bl) {
+      const boost = A.state.trainBoost[track.id] || 1;
+      bl.textContent = boost < 0.999 ? 'ускорение ×' + boost.toFixed(2) : '';
+    }
+  }
+
+  function startTrainer(track, level, card, trackIdx) {
+    const spec = track.levels[level - 1];
+    const eff = trainEff(spec, track);
+    const ex = {
+      type: spec.type === 'rsvp' ? 'reader' : spec.type,
+      title: track.title + ' · ' + spec.name,
+      instruction: track.desc,
+      xp: spec.xp,
+      params: trainParams(spec, eff)
+    };
+    const host = $('#train-host', view);
+    host.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'ex';
+    box.innerHTML = '<div class="ex-head"><span class="kind">Тренажёр</span>' + icon(track.icon) +
+      '<div><h4>' + esc(track.title) + ' · уровень ' + level + '</h4>' +
+      '<div class="hint">' + esc(track.desc) + '</div></div>' +
+      '<span class="xp">+' + spec.xp + ' XP</span></div><div class="ex-body"></div>';
+    host.appendChild(box);
+    const body = box.querySelector('.ex-body');
+    const key = 400 + trackIdx * 10 + (level - 1);
+    const ctx = {
+      day: 0, idx: key, ex: ex,
+      complete(result, exx, extra) {
+        const r = Object.assign({}, result || {}, extra || {});
+        A.completeExercise(0, key, exx || ex, r);
+        let pass = false;
+        if (spec.type === 'schulte') pass = r.valid !== false && r.seconds <= eff;
+        else if (spec.type === 'wedge') pass = !!r.pass;
+        else if (spec.type === 'timedread') pass = !!r.pass;
+        else pass = (r.comp || 0) >= 70;
+
+        const st = A.state;
+        if (pass) {
+          if (st.trainAccel) {
+            st.trainBoost[track.id] = Math.max(0.6, Math.round((st.trainBoost[track.id] || 1) * 0.9 * 100) / 100);
+          }
+          const unlocked = st.train[track.id] || 1;
+          if (level === unlocked && unlocked < track.levels.length) {
+            st.train[track.id] = unlocked + 1;
+            A.toast('Уровень ' + (unlocked + 1) + ' открыт', 'ach', '★');
+            A.confetti(90);
+          } else {
+            A.toast('Уровень пройден', '', '✓');
+          }
+        } else {
+          st.trainBoost[track.id] = 1;
+          A.toast('Пока не хватает — попробуйте ещё раз', 'bad', '↺');
+        }
+        A.save();
+        refreshTrackCard(card, track);
+      }
+    };
+    window.Train[ex.type](body, ex, ctx);
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function renderTrain() {
-    const defs = trainers();
     const st = A.state;
+    if (!st.train) st.train = {};
+    if (!st.trainBoost) st.trainBoost = {};
+    const tracks = trainTracks();
     view.innerHTML =
       '<div class="view">' +
       '<div class="section-head" style="margin-top:6px"><h1 style="font-size:30px">Тренажёр</h1>' +
-      '<span class="hint">короткие тренировки, не привязанные к дню</span></div>' +
-      '<div class="panel panel-pad" style="margin-bottom:20px;display:flex;gap:18px;align-items:center;flex-wrap:wrap">' +
-        '<div>' + icon('schulte', 'ex-ic') + '</div>' +
-        '<p class="muted" style="margin:0;max-width:70ch;font-size:14px">Эти упражнения можно делать в любой момент — до урока, после или вместо разминки. ' +
-        'Опыт начисляется один раз за тренажёр, рекорды обновляются при каждом подходе.</p>' +
+      '<span class="hint">четыре дорожки, по четыре уровня в каждой</span></div>' +
+      '<div class="panel panel-pad" style="margin-bottom:20px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">' +
+        '<p class="muted" style="margin:0;max-width:70ch;font-size:14px">Начинайте с первого уровня, следующий открывается после успешного прохождения. ' +
+        'Включите «Ускорение» — после каждой удачной попытки время будет сокращаться на 10%, а темп расти.</p>' +
+        '<label class="switch" style="margin-left:auto"><input type="checkbox" data-accel' + (st.trainAccel ? ' checked' : '') + '> Ускорение</label>' +
       '</div>' +
-      '<div class="train-grid">' +
-        defs.map((d, i) => {
-          const done = !!(st.ex[A.exKey(0, 100 + i)] && st.ex[A.exKey(0, 100 + i)].done);
-          return '<div class="train-card">' +
-            '<div style="display:flex;align-items:center;gap:10px">' + icon(d.type) +
-              '<h3>' + esc(d.title) + '</h3>' + (done ? '<span class="tag" style="margin-left:auto;background:var(--green-soft);color:#0b6b51">пройдено</span>' : '') +
-            '</div>' +
-            '<p>' + esc(d.desc) + '</p>' +
-            '<div class="row"><span class="tag">' + d.min + '</span><span class="tag">+' + d.xp + ' XP</span>' +
-              '<button class="btn btn-primary btn-sm" data-train="' + i + '">Начать</button></div>' +
-          '</div>';
-        }).join('') +
-      '</div>' +
+      '<div class="train-grid" data-tracks></div>' +
       '<div id="train-host" style="margin-top:22px"></div>' +
       '</div>';
 
-    $$('[data-train]', view).forEach(btn => btn.addEventListener('click', () => {
-      const def = defs[+btn.dataset.train];
-      const host = $('#train-host', view);
-      host.innerHTML = '';
+    const grid = $('[data-tracks]', view);
+    tracks.forEach((track, trackIdx) => {
+      const unlocked = trackUnlocked(track);
+      const boost = A.state.trainBoost[track.id] || 1;
       const card = document.createElement('div');
-      card.className = 'ex';
+      card.className = 'track';
       card.innerHTML =
-        '<div class="ex-head"><span class="kind">Тренажёр</span>' + icon(def.type) +
-          '<div><h4>' + esc(def.title) + '</h4><div class="hint">' + esc(def.desc) + '</div></div>' +
-          '<span class="xp">+' + def.xp + ' XP</span></div><div class="ex-body"></div>';
-      host.appendChild(card);
-      const body = card.querySelector('.ex-body');
-      const ex = { type: def.type, title: def.title, instruction: def.desc, xp: def.xp, params: def.params };
-      const key = 100 + defs.indexOf(def);
-      const ctx = {
-        day: 0, idx: key, ex: ex,
-        complete(result, exx, extra) {
-          A.completeExercise(0, key, exx || ex, Object.assign({}, result || {}, extra || {}));
-          card.classList.add('done');
-          card.querySelector('.xp').textContent = '✓ ' + def.xp + ' XP';
-        }
-      };
-      window.Train[def.type](body, ex, ctx);
-      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }));
+        '<div class="head">' + icon(track.icon) + '<h3>' + esc(track.title) + '</h3></div>' +
+        '<p>' + esc(track.desc) + '</p>' +
+        '<div class="levels">' + track.levels.map((lv, i) =>
+          '<button class="lvl' + (i + 1 < unlocked ? ' passed' : '') + (i + 1 > unlocked ? ' locked' : '') +
+          '" data-lvl="' + (i + 1) + '"' + (i + 1 > unlocked ? ' disabled' : '') + '>' + esc(lv.name) + '</button>').join('') +
+        '</div>' +
+        '<div class="row"><span class="muted" style="font-size:12px">уровень ' + unlocked + ' из ' + track.levels.length + '</span>' +
+        '<span class="boost" data-boost>' + (boost < 0.999 ? 'ускорение ×' + boost.toFixed(2) : '') + '</span></div>';
+      grid.appendChild(card);
+      card.querySelectorAll('.lvl').forEach(btn => {
+        btn.addEventListener('click', () => startTrainer(track, +btn.dataset.lvl, card, trackIdx));
+      });
+    });
+
+    const accel = $('[data-accel]', view);
+    if (accel) accel.addEventListener('change', () => {
+      A.state.trainAccel = accel.checked;
+      if (!accel.checked) {
+        Object.keys(A.state.trainBoost).forEach(k => { A.state.trainBoost[k] = 1; });
+      }
+      A.save();
+      renderTrain();
+    });
   }
 
-  /* -------------------------------- аудио ------------------------------ */
+/* -------------------------------- аудио ------------------------------ */
   let taAudio = null;
   const taState = { index: 0, playing: false, list: [] };
   const PLAY_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';

@@ -721,3 +721,28 @@ button,.opt,.day,label{touch-action:manipulation}
 .theory-block .tw.read{color:var(--muted);opacity:.55}
 .theory-block .tw.cur{background:var(--accent-soft);color:var(--ink);padding:0 2px;margin:0 -2px}
 [data-theme="graphite"] .theory-block .tw.cur{background:#25345a;color:#eaf0ff}
+
+/* точка фокуса и таймер на убывание */
+.wedge-wrap{position:relative;padding:4px 0}
+.focus-dot{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+  background:var(--orange);box-shadow:0 0 0 4px color-mix(in srgb, var(--panel) 75%, transparent);z-index:3;pointer-events:none}
+.focus-dot[hidden]{display:none}
+.timer.danger{color:#d92d20;animation:blink .8s steps(2,start) infinite}
+[data-theme="graphite"] .timer.danger{color:#ff6b5e}
+@keyframes blink{50%{opacity:.2}}
+
+/* дорожки тренажёров */
+.track{display:flex;flex-direction:column;gap:12px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.track .head{display:flex;align-items:center;gap:10px}
+.track h3{font-size:16.5px}
+.track p{font-size:13px;color:var(--muted);margin:0}
+.levels{display:flex;gap:8px;flex-wrap:wrap}
+.lvl{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--soft);color:var(--muted);
+  font-weight:800;font-size:13px;cursor:pointer}
+.lvl.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-2)}
+.lvl.passed{background:var(--green-soft);border-color:#bfe7d8;color:#0b6b51}
+.lvl.locked{opacity:.45;cursor:not-allowed}
+.track .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:auto}
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.switch input{accent-color:var(--accent)}
+.boost{font-size:12px;color:var(--orange);font-weight:700}
